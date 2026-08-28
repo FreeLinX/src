@@ -1,0 +1,9 @@
+NAME=FreeLinX
+ID=freelinx
+VERSION_ID="0.0-dev"
+PRETTY_NAME="FreeLinX 0.0-dev (bootstrap)"
+ANSI_COLOR="1;36"
+BUILD_ID="bootstrap"
+HOME_URL=
+SUPPORT_URL=
+BUG_REPORT_URL=

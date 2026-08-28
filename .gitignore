@@ -1,0 +1,31 @@
+# Build output (never commit generated artifacts).
+/build/
+
+# Compiler and generated-object caches.
+.cache/
+__pycache__/
+*.o
+*.a
+*.d
+*.bc
+*.ll
+
+# Downloaded sources and archives.
+*.tar
+*.tar.gz
+*.tgz
+*.tar.xz
+*.tar.bz2
+*.zip
+*.iso
+
+# Editor/OS noise.
+*~
+*.swp
+.DS_Store
+.vscode/
+.idea/
+
+# The rootfs/ tree is the version-controlled source template. Anything a
+# build writes into the repository rootfs is a mistake; generated content
+# belongs under build/ and is ignored above.
