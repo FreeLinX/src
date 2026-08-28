@@ -1,0 +1,44 @@
+#!/bin/sh
+# FreeLinX /init - EARLY BOOTSTRAP PLACEHOLDER, NOT THE FINAL INIT.
+#
+# The intended final init is a lightweight runit-based integration
+# (/sbin/runsvdir supervising /var/service). Until that (and the statically
+# linked runit binaries it needs) exist, this placeholder is installed so the
+# system has a well-defined boot entry point.
+#
+# Constraints:
+#   - POSIX /bin/sh only; no bash, no coreutils-only syntax.
+#   - Must keep working even when /bin/sh is an early statically linked
+#     shell. The build framework never executes this file; it is staged for
+#     when the target actually boots.
+#   - Mounts are best-effort: a real init will handle errors properly.
+
+set -eu
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+export PATH
+
+mount_pseudo() {
+    mount -t proc     proc /proc 2>/dev/null || :
+    mount -t sysfs    sys  /sys   2>/dev/null || :
+    mount -t devtmpfs dev  /dev   2>/dev/null || :
+}
+
+# Preferred path: runit service supervision, once available.
+if [ -x /sbin/runsvdir ] && [ -d /var/service ]; then
+    mount_pseudo
+    exec /sbin/runsvdir -P /var/service
+fi
+
+mount_pseudo
+
+# Fallback: rescue shell.
+if [ -x /bin/sh ]; then
+    echo "FreeLinX: no init supervisor installed; starting rescue shell." >&2
+    exec /bin/sh
+fi
+
+echo "FreeLinX: boot failed - no init supervisor and no rescue shell available." >&2
+while :; do
+    sleep 1
+done
