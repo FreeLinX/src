@@ -4,10 +4,7 @@ Root filesystem and integration repo for FreeLinX.
 
 `rootfs/` is the layout template. The scripts under `scripts/` stage it into
 a build tree and, later, install userland into it. The build validates the
-host, loads a config file, and reports what it can and cannot do. Nothing in
-here is runnable code yet — no kernel, no toolchain binaries, no userland.
-Those come from other repos, and the build says so instead of pretending
-they exist.
+host, loads a config file, and reports what it can and cannot do.
 
 ## What each piece is
 
@@ -19,9 +16,13 @@ they exist.
 - `scripts/check.sh` — read-only diagnostics: host tools, config,
   toolchain, sibling repos, rootfs template.
 - `scripts/clean.sh` — deletes `build/`.
-- `rootfs/init` — a bootstrap placeholder for `/init`. Not the final init;
-  the plan is runit later. It mounts proc/sys/dev and drops to a rescue
-  shell if no supervisor exists yet.
+- `rootfs/init` — `/init`. Mounts proc/sys/dev, then execs
+  `/sbin/runsvdir -P /var/service` if runit is present, falling back to a
+  rescue shell otherwise. **Verified booting in QEMU (2026-08-30)**: kernel
+  → `/init` → `runsvdir` → `runsv` supervising a test service, restarting
+  it on exit as designed. The runit binaries (`runsvdir`, `runsv`, `sv`,
+  `chpst`) come from `FreeLinX/ports` (`sysutils/runit`); `/var/service/*`
+  entries are added per-service as FreeLinX gains real supervised daemons.
 - `config/x86_64/default.conf` — the only config file for now (x86_64).
 
 The build writes nothing back into `rootfs/`; that tree stays source.
@@ -37,11 +38,10 @@ Generated stuff goes to:
     make rootfs    # or: ./scripts/rootfs.sh
     make clean     # or: ./scripts/clean.sh
 
-Expected output right now:
-
-    [FreeLinX] toolchain: not available yet (bootstrap stage)
-    [FreeLinX] kernel: not yet available, skipping
-    [FreeLinX] userland not yet available, skipping
+As of the toolchain/kernel/ports bring-up, `make check` reports the
+toolchain, kernel, and ports repos as present, and `make rootfs` stages a
+bootable root filesystem including `netbsd-sh`, runit, and the ported base
+utilities. Run `make check` for the current, exact status.
 
 ## Configuration
 
@@ -59,8 +59,8 @@ Host tools the scripts need: `sh`, `mkdir`, `cp`, `rm`, `date`, `find`,
 ## Repository relationships
 
     toolchain  builds clang/LLD + musl        -> ../toolchain
-    kernel     Linux 6.1                      -> ../kernel
-    ports      NetBSD-derived userland        -> ../ports
+    kernel     Linux 6.6.21                   -> ../kernel
+    ports      NetBSD-derived userland + runit -> ../ports
     iso        final ISO, consumes build/<arch>/ and the manifest
     freelinxf  project docs (separate)
 
