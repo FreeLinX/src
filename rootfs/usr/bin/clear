@@ -1,0 +1,5 @@
+#!/bin/sh
+# clear -- FreeLinX minimal screen-clear utility.
+# Emits the standard ANSI "move to home, erase display" escape sequence.
+# See this port's Makefile for why this is not a terminfo-based clear.
+printf '\033[H\033[2J'
