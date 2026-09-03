@@ -33,3 +33,4 @@ __pycache__/
 # separate tarball (firmware-6.6.21.tar.xz) in the release and must be
 # extracted into the rootfs before booting on real hardware.
 rootfs/lib/firmware/
+rootfs/lib/modules/6.6.21/build
