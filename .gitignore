@@ -29,3 +29,7 @@ __pycache__/
 # The rootfs/ tree is the version-controlled source template. Anything a
 # build writes into the repository rootfs is a mistake; generated content
 # belongs under build/ and is ignored above.
+# WiFi firmware is large; it is NOT version-controlled. It ships as a
+# separate tarball (firmware-6.6.21.tar.xz) in the release and must be
+# extracted into the rootfs before booting on real hardware.
+rootfs/lib/firmware/

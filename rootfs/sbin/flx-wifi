@@ -1,0 +1,132 @@
+#!/bin/sh
+# flx-wifi - distro-style WiFi manager for FreeLinX.
+# Wraps wpa_supplicant + wpa_cli + dhcpcd. Linux-only (nl80211).
+#
+#   flx-wifi scan                     : scan + list visible networks
+#   flx-wifi list                     : list known networks (config)
+#   flx-wifi connect "SSID" [pass]    : connect (open or WPA with password)
+#   flx-wifi disconnect               : drop the current connection
+#   flx-wifi status                   : show current connection
+#   flx-wifi off                      : stop the supplicant
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+export PATH
+
+IFACE="${FLX_WIFI_IFACE:-wlan0}"
+SUP=/sbin/wpa_supplicant
+CLI=/sbin/wpa_cli
+DHCP=/sbin/dhcpcd
+CONF=/var/run/flx-wifi.conf
+CTRL=/var/run/wpa_supplicant
+NETWORKS=/etc/wpa_supplicant/flx-wifi.conf
+PSKTOOL=/sbin/wpa_passphrase
+
+log()
+{
+	printf '[flx-wifi] %s\n' "$*"
+}
+
+die()
+{
+	printf '[flx-wifi] error: %s\n' "$*" >&2
+	exit 1
+}
+
+iface_up()
+{
+	flx-ifconfig "$IFACE" 2>/dev/null | grep -q 'UP' || flx-ifconfig "$IFACE" up 2>/dev/null || :
+}
+
+ensure_sup()
+{
+	[ -d "$CTRL" ] || mkdir -p "$CTRL"
+	[ -f "$CONF" ] || printf 'ctrl_interface=%s\nupdate_config=1\n' "$CTRL" > "$CONF"
+	if ! "$CLI" -i "$IFACE" ping > /dev/null 2>&1; then
+		"$SUP" -B -i "$IFACE" -c "$CONF" -D nl80211 2>/dev/null || \
+			"$SUP" -B -i "$IFACE" -c "$CONF" 2>/dev/null || \
+			die "cannot start wpa_supplicant on $IFACE (driver module loaded?)"
+		sleep 1
+	fi
+}
+
+cmd_scan()
+{
+	iface_up
+	ensure_sup
+	log "scanning on $IFACE (waiting 4s)..."
+	"$CLI" -i "$IFACE" scan > /dev/null 2>&1
+	sleep 4
+	"$CLI" -i "$IFACE" scan_results
+}
+
+cmd_list()
+{
+	if [ -f "$NETWORKS" ]; then
+		log "known networks (from $NETWORKS):"
+		sed -n 's/network={//p; s/ssid="\(.*\)"/  \1/p' "$NETWORKS" 2>/dev/null
+	else
+		log "no saved networks in $NETWORKS"
+	fi
+}
+
+cmd_connect()
+{
+	ssid=$1
+	pass=$2
+	[ -n "$ssid" ] || die "usage: flx-wifi connect \"SSID\" [password]"
+	iface_up
+	"$CLI" -i "$IFACE" flush > /dev/null 2>&1
+	if [ -n "$pass" ] && [ "$pass" != "-" ]; then
+		log "connecting to '$ssid' with WPA password..."
+		"$CLI" -i "$IFACE" add_network > /dev/null
+		"$CLI" -i "$IFACE" set_network 0 ssid "\"$ssid\""
+		psk=$("$PSKTOOL" "$ssid" "$pass" 2>/dev/null | sed -n 's/^\tpsk=//p')
+		if [ -n "$psk" ]; then
+			"$CLI" -i "$IFACE" set_network 0 psk "\"$psk\""
+		else
+			"$CLI" -i "$IFACE" set_network 0 psk "\"$pass\""
+		fi
+		"$CLI" -i "$IFACE" enable_network 0
+	else
+		log "connecting to open network '$ssid'..."
+		"$CLI" -i "$IFACE" add_network > /dev/null
+		"$CLI" -i "$IFACE" set_network 0 ssid "\"$ssid\""
+		"$CLI" -i "$IFACE" set_network 0 key_mgmt NONE
+		"$CLI" -i "$IFACE" enable_network 0
+	fi
+	log "requesting IP via dhcpcd..."
+	"$DHCP" -q "$IFACE" 2>/dev/null || log "dhcpcd failed (check connection)"
+	log "done. status:"
+	cmd_status
+}
+
+cmd_disconnect()
+{
+	"$CLI" -i "$IFACE" disconnect 2>/dev/null && log "disconnected" || log "not connected"
+	"$CLI" -i "$IFACE" remove_network 0 2>/dev/null || :
+}
+
+cmd_status()
+{
+	s=$("$CLI" -i "$IFACE" status 2>/dev/null | grep -E 'ssid|key_mgmt|ip_address|state|wpa_state|id=') || :
+	if [ -n "$s" ]; then
+		printf '%s\n' "$s"
+	else
+		log "not connected / supplicant not running"
+	fi
+}
+
+cmd_off()
+{
+	"$CLI" -i "$IFACE" terminate 2>/dev/null && log "supplicant stopped" || log "no supplicant running"
+}
+
+case "${1:-}" in
+	scan)       cmd_scan ;;
+	list)       cmd_list ;;
+	connect)    cmd_connect "$2" "$3" ;;
+	disconnect) cmd_disconnect ;;
+	status)     cmd_status ;;
+	off)        cmd_off ;;
+	*) echo "usage: flx-wifi {scan|list|connect \"SSID\" [pass]|disconnect|status|off}"; exit 1 ;;
+esac
