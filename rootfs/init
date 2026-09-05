@@ -17,6 +17,12 @@ set -eu
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 export PATH
+TERM=xterm
+export TERM
+HOME=/root
+export HOME
+PS1='\w # '
+export PS1
 
 mount_pseudo() {
     mount -t proc     proc /proc 2>/dev/null || :
