@@ -1,0 +1,29 @@
+.Dd September 7, 2026
+.Dt TABS 1
+.Os FreeLinX
+.Sh NAME
+.Nm tabs
+.Nd set terminal tabs
+.Sh SYNOPSIS
+.Nm tabs
+.Op Fl T Ar terminal
+.Op Ar tabstop ...
+.Sh DESCRIPTION
+.Nm
+sets tab stops on a terminal, either at the positions given as
+.Ar tabstop
+arguments or using a tab setting specification.
+.Pp
+Terminal control is accomplished using escape sequences obtained
+from the terminfo database, based on the
+.Ev TERM
+environment variable or the
+.Fl T
+option.
+.Sh SEE ALSO
+.Xr terminfo 5 ,
+.Xr tput 1
+.Sh HISTORY
+A
+.Nm
+command appeared in 4.1BSD.

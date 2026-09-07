@@ -1,0 +1,37 @@
+.Dd September 7, 2026
+.Dt INFOCMP 1
+.Os FreeLinX
+.Sh NAME
+.Nm infocmp
+.Nd compare or print out terminfo descriptions
+.Sh SYNOPSIS
+.Nm infocmp
+.Op Fl 1x
+.Op Fl T Ar terminal
+.Op Ar terminal ...
+.Sh DESCRIPTION
+.Nm
+compares or prints out terminfo descriptions.
+With a single
+.Ar terminal
+argument, it prints the description in terminfo source format;
+with two, it shows what differs between them.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl 1
+Print each capability on its own line.
+.It Fl T Ar terminal
+Use the named terminal instead of the
+.Ev TERM
+environment variable.
+.It Fl x
+Print extended (non-standard) capabilities.
+.El
+.Sh SEE ALSO
+.Xr terminfo 5 ,
+.Xr tput 1
+.Sh HISTORY
+An
+.Nm
+command appeared in SVR2.

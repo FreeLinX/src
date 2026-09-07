@@ -1,0 +1,30 @@
+.Dd September 7, 2026
+.Dt DOAS 1
+.Os FreeLinX
+.Sh NAME
+.Nm doas
+.Nd execute commands with elevated privileges
+.Sh SYNOPSIS
+.Nm doas
+.Op Fl su
+.Op Fl C Ar config
+.Op Fl U Ar user
+.Ar command
+.Op Ar args ...
+.Sh DESCRIPTION
+.Nm
+executes
+.Ar command
+with elevated privileges, subject to the rules described in
+.Xr doas.conf 5 .
+Pn configurations are not supported; rule matching is limited.
+.Sh FILES
+.Bl -tag -width /etc/doas.conf -compact
+.It Pa /etc/doas.conf
+Policy rules.
+.El
+.Sh SEE ALSO
+.Xr doas.conf 5
+.Sh HISTORY
+.Nm
+first appeared in OpenBSD 5.8.

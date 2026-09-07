@@ -1,0 +1,38 @@
+.Dd September 7, 2026
+.Dt CP 1
+.Os FreeLinX
+.Sh NAME
+.Nm cp
+.Nd copy files
+.Sh SYNOPSIS
+.Nm cp
+.Op Fl Rr
+.Ar source Ns \
+.Op Ar target ... Ns \
+.Ar destination
+.Sh DESCRIPTION
+.Nm
+copies the contents of
+.Ar source
+to
+.Ar target .
+If more than one
+.Ar source
+is given, the last operand must be a directory and each source is
+copied into it.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl R , Fl r
+Recursively copy directories.
+.It Fl p
+Preserve mode, ownership, and timestamps when copying.
+.El
+.Sh SEE ALSO
+.Xr install 1 ,
+.Xr mv 1 ,
+.Xr rm 1
+.Sh HISTORY
+A
+.Nm
+command appeared in Version&nbsp;1 AT&amp;T UNIX.

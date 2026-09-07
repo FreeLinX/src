@@ -1,0 +1,28 @@
+.Dd September 7, 2026
+.Dt FLX-WIFI 8
+.Os FreeLinX
+.Sh NAME
+.Nm flx-wifi
+.Nd wireless network management
+.Sh SYNOPSIS
+.Nm flx-wifi
+.Ar scan
+.Nm flx-wifi
+.Ar connect Ar network Op Ar passphrase
+.Nm flx-wifi
+.Ar status
+.Sh DESCRIPTION
+.Nm
+manages wireless networking on FreeLinX.
+.Pp
+.Nm flx-wifi Ar connect "MyNetwork" "password"
+connects to the named wireless network.
+.Nm flx-wifi Ar scan
+lists visible access points.
+.Sh SEE ALSO
+.Xr flx-ifconfig 8 ,
+.Xr flx-route 8 ,
+.Xr iwifi 4
+.Sh HISTORY
+.Nm
+first appeared in FreeLinX.

@@ -1,0 +1,40 @@
+.Dd September 7, 2026
+.Dt CAT 1
+.Os FreeLinX
+.Sh NAME
+.Nm cat
+.Nd concatenate and print files
+.Sh SYNOPSIS
+.Nm cat
+.Op Fl benstuv
+.Op Ar file ...
+.Sh DESCRIPTION
+.Nm
+reads each
+.Ar file
+in sequence and writes them to standard output.
+If no
+.Ar file
+is given, or if
+.Ar file
+is
+.Ql - ,
+standard input is read.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl n
+Number each line.
+.It Fl s
+Suppress repeated empty lines.
+.It Fl v
+Display non-printing characters visibly.
+.El
+.Sh SEE ALSO
+.Xr head 1 ,
+.Xr more 1 ,
+.Xr tail 1
+.Sh HISTORY
+A
+.Nm
+command appeared in Version&nbsp;2 AT&amp;T UNIX.

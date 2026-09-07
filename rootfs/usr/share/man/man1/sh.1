@@ -1,0 +1,33 @@
+.Dd September 7, 2026
+.Dt SH 1
+.Os FreeLinX
+.Sh NAME
+.Nm sh
+.Nd command interpreter
+.Sh SYNOPSIS
+.Nm sh
+.Op Fl abCefhimnuvx
+.Op Ar command_file Op Ar argument ...
+.Sh DESCRIPTION
+.Nm
+is the standard command interpreter for FreeLinX.
+It reads and interprets commands from
+.Ar command_file ,
+or from standard input when the file is
+.Ql - .
+.Pp
+The shell implements the features essential for scripting:
+redirection, pipelines, command substitution, control structures
+.Pf ( Xr if 1 ,
+.Nm for ,
+.Nm while ) ,
+functions, and shell variables.
+.Sh SEE ALSO
+.Xr ls 1 ,
+.Xr cat 1 ,
+.Xr cp 1 ,
+.Xr rm 1
+.Sh HISTORY
+A
+.Nm
+command appeared in Version&nbsp;7 AT&amp;T UNIX.

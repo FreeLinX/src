@@ -1,0 +1,41 @@
+.Dd September 7, 2026
+.Dt TSET 1
+.Os FreeLinX
+.Sh NAME
+.Nm tset
+.Nd terminal initialization
+.Sh SYNOPSIS
+.Nm tset
+.Op Fl e Fl k Fl m
+.Op Fl I
+.Op Fl Q
+.Op Ar terminal
+.Sh DESCRIPTION
+.Nm
+initializes a terminal, positioning the cursor, clearing the screen,
+and selecting suitable characteristics for the terminal type given
+by
+.Ar terminal
+or by the
+.Ev TERM
+environment variable.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl e
+Cursor visibility.
+.It Fl I
+Immediately draw the terminal, ignoring input.
+.It Fl k
+Function key sequences.
+.It Fl m
+Map the terminal type of the input line to another type.
+.El
+.Sh SEE ALSO
+.Xr tput 1 ,
+.Xr tset 1 ,
+.Xr terminfo 5
+.Sh HISTORY
+A
+.Nm
+command appeared in 4.2BSD.

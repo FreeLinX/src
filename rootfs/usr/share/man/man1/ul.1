@@ -1,0 +1,38 @@
+.Dd September 7, 2026
+.Dt UL 1
+.Os FreeLinX
+.Sh NAME
+.Nm ul
+.Nd do underlining
+.Sh SYNOPSIS
+.Nm ul
+.Op Fl t Ar terminal
+.Op Ar file ...
+.Sh DESCRIPTION
+.Nm
+reads its input and translates underlining and overstriking sequences
+produced by programs such as
+.Xr man 1
+into terminal specific escape sequences, writing the result to
+standard output.
+.Pp
+If no
+.Ar file
+is given, or if
+.Ar file
+is
+.Ql - ,
+standard input is read.
+The terminal is selected with the
+.Fl t
+option, defaulting to the
+.Ev TERM
+environment variable.
+.Sh SEE ALSO
+.Xr man 1 ,
+.Xr terminfo 5 ,
+.Xr tput 1
+.Sh HISTORY
+An
+.Nm
+command appeared in 4.2BSD.

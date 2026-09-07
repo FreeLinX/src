@@ -1,0 +1,30 @@
+.Dd September 7, 2026
+.Dt MKDIR 1
+.Os FreeLinX
+.Sh NAME
+.Nm mkdir
+.Nd make directories
+.Sh SYNOPSIS
+.Nm mkdir
+.Op Fl pv
+.Ar directory ...
+.Sh DESCRIPTION
+.Nm
+creates the directories named by
+.Ar directory
+entries.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl p
+Create intermediate directories as required.
+.It Fl v
+Print the name of each directory as it is created.
+.El
+.Sh SEE ALSO
+.Xr rmdir 8 ,
+.Xr mkdir 2
+.Sh HISTORY
+A
+.Nm
+command appeared in Version&nbsp;11 AT&amp;T UNIX.

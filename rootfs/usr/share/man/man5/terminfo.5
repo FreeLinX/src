@@ -1,0 +1,35 @@
+.Dd September 7, 2026
+.Dt TERMINFO 5
+.Os FreeLinX
+.Sh NAME
+.Nm terminfo
+.Nd terminal capability database
+.Sh DESCRIPTION
+.Pa /usr/share/misc/terminfo.cdb
+is a NetBSD Constant Database holding the terminal capabilities used
+by
+.Xr tput 1 ,
+.Xr tset 1 ,
+and
+.Xr ul 1 .
+.Pp
+Each record describes one terminal type, keyed by the terminal name
+used in the
+.Ev TERM
+environment variable, and contains boolean, numeric, and string
+capabilities describing the terminal's behaviour, such as cursor
+movement, line clearing, and tab stops.
+.Pp
+The database is generated from terminfo source using
+.Xr tic 1
+with the
+.Fl x
+option.
+.Sh SEE ALSO
+.Xr tput 1 ,
+.Xr tset 1 ,
+.Xr infocmp 1 ,
+.Xr tabs 1 ,
+.Xr tic 1
+.Sh HISTORY
+The terminfo database format first appeared in UNIX System V.
