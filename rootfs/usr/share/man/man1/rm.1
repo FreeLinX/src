@@ -1,0 +1,37 @@
+.Dd September 7, 2026
+.Dt RM 1
+.Os FreeLinX
+.Sh NAME
+.Nm rm
+.Nd remove directory entries
+.Sh SYNOPSIS
+.Nm rm
+.Op Fl dfiRr
+.Ar file ...
+.Sh DESCRIPTION
+.Nm
+removes the entries named by
+.Ar file .
+.Sh SAFETY
+.Nm
+does not allow the removal of the root directory or of a
+non-empty directory unless the
+.Fl r
+option is given.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl f
+Do not report errors and never prompt.
+.It Fl i
+Prompt for confirmation before each removal.
+.It Fl R , Fl r
+Recursively remove directories and their contents.
+.El
+.Sh SEE ALSO
+.Xr rmdir 8 ,
+.Xr unlink 2
+.Sh HISTORY
+An
+.Nm
+command appeared in Version&nbsp;1 AT&amp;T UNIX.

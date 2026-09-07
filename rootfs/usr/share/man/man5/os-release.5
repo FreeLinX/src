@@ -1,0 +1,30 @@
+.Dd September 7, 2026
+.Dt OS-RELEASE 5
+.Os FreeLinX
+.Sh NAME
+.Nm os-release
+.Nd operating system identification data
+.Sh DESCRIPTION
+.Pa /etc/os-release
+contains operating system identification data in the key-value
+format specified by the
+.Dq os-release
+specification.
+.Pp
+The following keys are defined:
+.Bl -tag -width NAME -compact
+.It NAME
+The operating system name.
+.It ID
+A short identifier for the operating system.
+.It VERSION_ID
+The version of the operating system.
+.It PRETTY_NAME
+A human readable version string.
+.El
+.Sh SEE ALSO
+.Xr uname 1
+.Sh HISTORY
+A
+.Nm
+file format appeared in systemd and was subsequently standardized.

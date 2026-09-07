@@ -1,0 +1,38 @@
+.Dd September 7, 2026
+.Dt TPUT 1
+.Os FreeLinX
+.Sh NAME
+.Nm tput
+.Nd initialize a terminal or query terminfo database
+.Sh SYNOPSIS
+.Nm tput
+.Op Fl sTq
+.Ar capability
+.Op Ar parameter ...
+.Sh DESCRIPTION
+.Nm
+uses the terminfo database to initialize the terminal or to query
+the value of the named
+.Ar capability .
+The terminal is selected with the
+.Ev TERM
+environment variable and overridden by the
+.Fl T
+option.
+.Pp
+.Nm
+prints the result of boolean and numeric capabilities, and sends
+the escape sequences of string capabilities.
+The
+.Fl s
+option processes capabilities in orders so that output is
+interleaved with initialization strings.
+.Sh SEE ALSO
+.Xr tabs 1 ,
+.Xr terminfo 5 ,
+.Xr tset 1 ,
+.Xr ul 1
+.Sh HISTORY
+A
+.Nm
+command appeared in 4.2BSD.

@@ -1,0 +1,28 @@
+.Dd September 7, 2026
+.Dt FLX-ROUTE 8
+.Os FreeLinX
+.Sh NAME
+.Nm flx-route
+.Nd manipulate the routing table
+.Sh SYNOPSIS
+.Nm flx-route
+.Ar add Ar net|host
+.Ar destination Op Ar gateway
+.Nm flx-route
+.Ar delete Ar destination
+.Nm flx-route
+.Ar show
+.Sh DESCRIPTION
+.Nm
+manipulates the FreeLinX kernel routing table.
+.Pp
+.Nm flx-route Ar add default 10.0.2.2
+sets the default gateway to
+.Li 10.0.2.2 .
+.Sh SEE ALSO
+.Xr flx-ifconfig 8 ,
+.Xr flx-wifi 8 ,
+.Xr route 8
+.Sh HISTORY
+.Nm
+first appeared in FreeLinX.

@@ -1,0 +1,29 @@
+.Dd September 7, 2026
+.Dt FLX-IFCONFIG 8
+.Os FreeLinX
+.Sh NAME
+.Nm flx-ifconfig
+.Nd configure network interface parameters
+.Sh SYNOPSIS
+.Nm flx-ifconfig
+.Ar interface
+.Op Ar address_family
+.Op Ar address
+.Op Ar parameter ...
+.Sh DESCRIPTION
+.Nm
+is the FreeLinX network interface configuration tool.
+It assigns an address to a network interface and sets up interface
+parameters such as the netmask and broadcast address.
+.Pp
+.Nm flx-ifconfig Ar eth0 up
+.Pq bring the interface up
+.Nm flx-ifconfig Ar eth0 Ar inet 10.0.2.15/24
+.Pq assign an address.
+.Sh SEE ALSO
+.Xr flx-route 8 ,
+.Xr flx-wifi 8 ,
+.Xr ifconfig 8
+.Sh HISTORY
+.Nm
+first appeared in FreeLinX.

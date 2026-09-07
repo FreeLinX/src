@@ -1,0 +1,38 @@
+.Dd September 7, 2026
+.Dt LS 1
+.Os FreeLinX
+.Sh NAME
+.Nm ls
+.Nd list directory contents
+.Sh SYNOPSIS
+.Nm ls
+.Op Fl AaCdfFimRrtu1
+.Op Ar file ...
+.Sh DESCRIPTION
+.Nm
+lists the contents of the named directories and the names of the
+named files.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl a
+Include entries whose names begin with a dot (`.`).
+.It Fl F
+Display a trailing indicator for special files.
+.It Fl l
+List in long format, including permissions, owner, size, and date.
+.It Fl R
+Recursively list subdirectories.
+.It Fl r
+Reverse the sort order.
+.It Fl t
+Sort by time modified instead of by name.
+.El
+.Sh SEE ALSO
+.Xr cat 1 ,
+.Xr cp 1 ,
+.Xr stat 2
+.Sh HISTORY
+An
+.Nm
+command appeared in Version&nbsp;1 AT&amp;T UNIX.
