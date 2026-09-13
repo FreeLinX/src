@@ -165,7 +165,7 @@
      cases. -->
 <margins>
   <top>0</top>
-  <bottom>0</bottom>
+  <bottom>28</bottom>
   <left>0</left>
   <right>0</right>
 </margins>
@@ -313,6 +313,15 @@
   </keybind>
   <keybind key="W-f">
     <action name="Execute"><command>flx-fm</command></action>
+  </keybind>
+  <keybind key="W-e">
+    <action name="Execute"><command>flx-pad</command></action>
+  </keybind>
+  <keybind key="W-i">
+    <action name="Execute"><command>flx-view</command></action>
+  </keybind>
+  <keybind key="Print">
+    <action name="Execute"><command>flx-shot</command></action>
   </keybind>
   <!-- Keybindings to open FreeLinX Root Menu -->
   <keybind key="W-space">

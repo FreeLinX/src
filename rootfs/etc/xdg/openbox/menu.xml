@@ -20,12 +20,21 @@
 </menu>
 
 <menu id="editors-menu" label="Editors">
+  <item label="Text Editor (flx-pad)">
+    <action name="Execute"><command>flx-pad</command></action>
+  </item>
   <item label="Vim">
     <action name="Execute"><command>uxterm -e vim</command></action>
   </item>
 </menu>
 
 <menu id="graphics-menu" label="Graphics">
+  <item label="Image Viewer (flx-view)">
+    <action name="Execute"><command>flx-view</command></action>
+  </item>
+  <item label="Take Screenshot (flx-shot)">
+    <action name="Execute"><command>flx-shot</command></action>
+  </item>
   <item label="3D OpenGL Gears (glxgears)">
     <action name="Execute"><command>glxgears</command></action>
   </item>
@@ -92,6 +101,9 @@
   <item label="System Information (pfetch)">
     <action name="Execute"><command>uxterm -e sh -c "pfetch; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
+  <item label="Process Monitor (htop)">
+    <action name="Execute"><command>uxterm -title "Process Monitor" -e htop</command></action>
+  </item>
 </menu>
 
 <menu id="tools-menu" label="Tools">
@@ -100,6 +112,9 @@
   </item>
   <item label="Xmag (Magnifier)">
     <action name="Execute"><command>xmag</command></action>
+  </item>
+  <item label="Custom Filesystem (flx-fs)">
+    <action name="Execute"><command>uxterm -e sh -c "flx-fs --help; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
 </menu>
 

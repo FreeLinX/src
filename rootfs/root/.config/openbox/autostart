@@ -1,15 +1,1 @@
-#!/bin/sh
-# FreeLinX Retro Desktop Autostart
-
-# Set retro dark charcoal desktop background
-if command -v xsetroot >/dev/null 2>&1; then
-    xsetroot -solid "#4c6b73" 2>/dev/null
-fi
-
-# Launch default interactive terminal
-(cd "$HOME" && /usr/bin/uxterm -g 84x26+40+40 -e /bin/sh -l) &
-
-# FreeLinX Network Manager
-if [ -x /usr/bin/flx-netmgr ]; then
-    /usr/bin/flx-netmgr &
-fi
+/etc/xdg/openbox/autostart
