@@ -1,11 +1,11 @@
 #!/bin/sh
 # FreeLinX Modern Retro Desktop Autostart
 
-# 1. Set clean flat solid desktop background
+# 1. Set clean flat solid desktop background (authentic Plan 9 CRT workstation muted gray)
 if [ -x /usr/bin/flx-bg ]; then
-    /usr/bin/flx-bg "#20242c"
+    /usr/bin/flx-bg "#778877"
 elif command -v xsetroot >/dev/null 2>&1; then
-    xsetroot -solid "#20242c" 2>/dev/null
+    xsetroot -solid "#778877" 2>/dev/null
 fi
 
 # 2. Launch FreeLinX Desktop Panel (Taskbar, RAM monitor, Clock, Start Menu)

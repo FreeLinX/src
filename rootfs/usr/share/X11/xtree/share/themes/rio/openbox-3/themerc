@@ -1,0 +1,94 @@
+# Rio Theme for FreeLinX Openbox
+# Authentic 1990s Plan 9 rio window system aesthetic
+
+# Global Window Geometry
+border.width: 1
+padding.width: 4
+padding.height: 2
+window.handle.width: 0
+window.client.padding.width: 0
+window.client.padding.height: 0
+
+# Window Borders (Thin, crisp, flat)
+window.active.border.color: #1a1a1a
+window.inactive.border.color: #777770
+
+# Window Titlebars (Flat solid, no gradients)
+# Active: subdued olive-green; Inactive: muted warm gray / beige
+window.active.title.bg: flat solid
+window.active.title.bg.color: #889988
+window.inactive.title.bg: flat solid
+window.inactive.title.bg.color: #c0c0b8
+
+window.active.title.separator.color: #1a1a1a
+window.inactive.title.separator.color: #777770
+
+# Window Titlebar Labels
+window.label.text.justify: left
+window.active.label.bg: parentrelative
+window.active.label.text.color: #000000
+window.inactive.label.bg: parentrelative
+window.inactive.label.text.color: #4a4a44
+
+# Window Buttons (Flat, simple, classic)
+window.*.button.*.bg: parentrelative
+window.active.button.*.image.color: #000000
+window.inactive.button.*.image.color: #555550
+
+window.active.button.*.hover.bg: flat solid
+window.active.button.*.hover.bg.color: #778877
+window.active.button.*.hover.image.color: #000000
+
+window.active.button.*.pressed.bg: flat solid
+window.active.button.*.pressed.bg.color: #556655
+window.active.button.*.pressed.image.color: #ffffff
+
+window.inactive.button.*.hover.bg: flat solid
+window.inactive.button.*.hover.bg.color: #b0b0a8
+window.inactive.button.*.hover.image.color: #000000
+
+window.active.button.disabled.image.color: #667766
+window.inactive.button.disabled.image.color: #999990
+
+# Client Area Framing
+window.active.client.color: #889988
+window.inactive.client.color: #c0c0b8
+
+# Root & Client Menus (Plan 9 rio classic pop-up: parchment/beige with crisp 1px border)
+menu.border.width: 1
+menu.border.color: #000000
+menu.overlap: 0
+
+menu.title.bg: flat solid
+menu.title.bg.color: #889988
+menu.title.text.color: #000000
+menu.title.text.justify: center
+
+menu.items.bg: flat solid
+menu.items.bg.color: #ffffee
+menu.items.text.color: #000000
+menu.items.disabled.text.color: #888880
+menu.items.justify: left
+
+menu.items.active.bg: flat solid
+menu.items.active.bg.color: #778877
+menu.items.active.text.color: #ffffff
+
+menu.separator.color: #b0b09f
+menu.separator.width: 1
+menu.separator.padding.width: 2
+menu.separator.padding.height: 2
+
+# On-Screen Display (OSD / Alt-Tab switcher)
+osd.border.width: 1
+osd.border.color: #000000
+osd.bg: flat solid
+osd.bg.color: #e8e8e0
+osd.label.bg: parentrelative
+osd.label.text.color: #000000
+osd.hilight.bg: flat solid
+osd.hilight.bg.color: #778877
+osd.hilight.label.text.color: #ffffff
+osd.unhilight.bg: flat solid
+osd.unhilight.bg.color: #e8e8e0
+osd.unhilight.label.text.color: #555550
