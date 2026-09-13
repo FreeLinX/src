@@ -102,7 +102,7 @@
     <action name="Execute"><command>uxterm -e sh -c "pfetch; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Process Monitor (htop)">
-    <action name="Execute"><command>uxterm -title "Process Monitor" -e htop</command></action>
+    <action name="Execute"><command>uxterm -T "Process Monitor" -e htop</command></action>
   </item>
 </menu>
 

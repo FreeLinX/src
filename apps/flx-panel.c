@@ -32,7 +32,7 @@ static MenuItem menu_items[MAX_MENU_ITEMS] = {
     {"Terminal (uxterm)",     "uxterm &"},
     {"File Manager (flx-fm)", "flx-fm &"},
     {"Web Browser",           "flx-browser &"},
-    {"Process Monitor (htop)","uxterm -title 'Process Monitor' -e htop &"},
+    {"Process Monitor (htop)","uxterm -T 'Process Monitor' -e htop &"},
     {"Text Editor (flx-pad)", "flx-pad &"},
     {"Image Viewer (flx-view)","flx-view &"},
     {"3D Gears (glxgears)",   "glxgears &"},

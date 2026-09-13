@@ -346,7 +346,7 @@ static void open_item(int idx) {
         snprintf(cmd, sizeof(cmd), "flx-view \"%s\" &", fullpath);
     } else if (ext && strcmp(ext, ".sh") == 0) {
         // Shell script: run in interactive uxterm
-        snprintf(cmd, sizeof(cmd), "uxterm -title uxterm -e sh -c \"'%s'; echo; printf 'Done. Press Enter...'; read l\" &", fullpath);
+        snprintf(cmd, sizeof(cmd), "uxterm -T 'Script' -e sh -c \"'%s'; echo; printf 'Done. Press Enter...'; read l\" &", fullpath);
     } else {
         // Text / code / config / unknown: open in flx-pad GUI editor
         snprintf(cmd, sizeof(cmd), "flx-pad \"%s\" &", fullpath);
