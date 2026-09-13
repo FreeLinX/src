@@ -1,11 +1,11 @@
 #!/bin/sh
 # FreeLinX Modern Retro Desktop Autostart
 
-# 1. Set official FreeLinX wallpaper
-if [ -x /usr/bin/flx-bg ] && [ -f /usr/share/backgrounds/freelinx-default.png ]; then
-    /usr/bin/flx-bg /usr/share/backgrounds/freelinx-default.png
+# 1. Set clean flat solid desktop background
+if [ -x /usr/bin/flx-bg ]; then
+    /usr/bin/flx-bg "#20242c"
 elif command -v xsetroot >/dev/null 2>&1; then
-    xsetroot -solid "#161922" 2>/dev/null
+    xsetroot -solid "#20242c" 2>/dev/null
 fi
 
 # 2. Launch FreeLinX Desktop Panel (Taskbar, RAM monitor, Clock, Start Menu)
