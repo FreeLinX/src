@@ -4,9 +4,7 @@
 GLOBALAUTOSTART=/etc/xdg/openbox/autostart
 AUTOSTART="${XDG_CONFIG_HOME:-"$HOME/.config"}/openbox/autostart"
 
-if command -v xsetroot >/dev/null 2>&1; then
-    xsetroot -solid "#4c6b73" 2>/dev/null
-fi
+
 
 if test -f "$AUTOSTART"; then
     sh "$AUTOSTART"
