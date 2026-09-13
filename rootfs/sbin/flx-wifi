@@ -51,11 +51,12 @@ ensure_sup()
 
 cmd_scan()
 {
+	[ -d "/sys/class/net/$IFACE" ] || die "wireless interface '$IFACE' not found. (Real WiFi requires physical hardware or USB WiFi passthrough)."
 	iface_up
 	ensure_sup
-	log "scanning on $IFACE (waiting 4s)..."
-	"$CLI" -i "$IFACE" scan > /dev/null 2>&1
-	sleep 4
+	log "scanning on $IFACE (waiting 3s)..."
+	"$CLI" -i "$IFACE" scan > /dev/null 2>&1 || die "wpa_cli scan failed"
+	sleep 3
 	"$CLI" -i "$IFACE" scan_results
 }
 
@@ -74,7 +75,10 @@ cmd_connect()
 	ssid=$1
 	pass=$2
 	[ -n "$ssid" ] || die "usage: flx-wifi connect \"SSID\" [password]"
+	[ -d "/sys/class/net/$IFACE" ] || die "wireless interface '$IFACE' not found."
+
 	iface_up
+	ensure_sup
 	"$CLI" -i "$IFACE" flush > /dev/null 2>&1
 	if [ -n "$pass" ] && [ "$pass" != "-" ]; then
 		log "connecting to '$ssid' with WPA password..."

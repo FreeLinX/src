@@ -1,0 +1,3 @@
+#!/bin/sh
+# FreeLinX Default Web Browser Launcher (Links Graphics Mode)
+exec /usr/bin/flx-browser "$@"

@@ -1,0 +1,22 @@
+#!/bin/sh
+# FreeLinX Hardware Hotplug Driver Prober
+# Invoked by mdevd / mdev upon new hardware events.
+#
+# Copyright (c) 2026 FreeLinX OS Project.
+# SPDX-License-Identifier: BSD-2-Clause
+
+ACTION="${ACTION:-add}"
+
+[ "$ACTION" = "add" ] || exit 0
+
+# If kernel supplied MODALIAS, load the driver directly
+if [ -n "$MODALIAS" ]; then
+    modprobe "$MODALIAS" 2>/dev/null || :
+fi
+
+# If flx-driver is installed, probe drivers for new hardware
+if [ -x /sbin/flx-driver ]; then
+    /sbin/flx-driver probe >/dev/null 2>&1 || :
+fi
+
+exit 0

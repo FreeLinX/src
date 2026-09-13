@@ -1,0 +1,14 @@
+#!/bin/sh
+# dbus session bus (FreeLinX single-user system; runs as root).
+# Socket address is stable so clients use DBUS_SESSION_BUS_ADDRESS from /init.
+# dbus-daemon --session reads its baked default /usr/share/dbus-1/session.conf.
+set -e
+mkdir -p /run/dbus /var/lib/dbus
+if [ ! -s /var/lib/dbus/machine-id ]; then
+    dbus-uuidgen > /var/lib/dbus/machine-id
+fi
+[ -e /etc/machine-id ] || cp /var/lib/dbus/machine-id /etc/machine-id
+exec dbus-daemon \
+    --config-file=/etc/dbus-1/session.conf \
+    --address=unix:path=/run/dbus/system_bus_socket \
+    --nofork --print-address=1

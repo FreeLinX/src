@@ -1,0 +1,5 @@
+# Root profile for FreeLinX
+[ -f /etc/profile ] && . /etc/profile
+export USER=root
+export HOME=/root
+export PS1="root@freelinx:~# "

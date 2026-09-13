@@ -1,0 +1,104 @@
+#!/bin/sh
+# FreeLinX User Creation Utility (flx-adduser)
+#
+# Adds desktop users with proper group memberships (wheel, video, audio, input, disk)
+# and seeds their retro desktop configuration.
+#
+# Copyright (c) 2026 FreeLinX OS Project.
+# SPDX-License-Identifier: BSD-2-Clause
+
+set -e
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Error: flx-adduser must be run as root." >&2
+    exit 1
+fi
+
+NEW_USER="$1"
+if [ -z "$NEW_USER" ]; then
+    printf "Enter new username: "
+    read -r NEW_USER
+fi
+
+[ -z "$NEW_USER" ] && { echo "Error: Username cannot be empty." >&2; exit 1; }
+
+# Validate username format
+case "$NEW_USER" in
+    *[!a-z0-9_-]*|^[0-9-]*)
+        echo "Error: Invalid username '$NEW_USER'. Use lowercase letters, digits, '_' or '-'." >&2
+        exit 1
+        ;;
+esac
+
+# Check if user already exists
+if grep -q "^$NEW_USER:" /etc/passwd 2>/dev/null; then
+    echo "Error: User '$NEW_USER' already exists." >&2
+    exit 1
+fi
+
+# Find next available UID >= 1000
+NEXT_UID=1000
+if [ -r /etc/passwd ]; then
+    MAX_UID=$(awk -F: '$3 >= 1000 && $3 < 60000 {if ($3 > max) max=$3} END {print max}' /etc/passwd)
+    if [ -n "$MAX_UID" ]; then
+        NEXT_UID=$((MAX_UID + 1))
+    fi
+fi
+
+USER_GID="$NEXT_UID"
+HOME_DIR="/home/$NEW_USER"
+
+# Add entry to /etc/passwd
+echo "$NEW_USER:x:$NEXT_UID:$USER_GID:$NEW_USER:$HOME_DIR:/bin/sh" >> /etc/passwd
+
+# Add primary group to /etc/group
+echo "$NEW_USER:x:$USER_GID:" >> /etc/group
+
+# Add to auxiliary groups (wheel, video, audio, input, disk)
+for grp in wheel video audio input disk; do
+    if grep -q "^$grp:" /etc/group; then
+        sed -i "/^$grp:/ s/$/,$NEW_USER/" /etc/group
+        # Clean double commas if any
+        sed -i "s/:,$NEW_USER/:$NEW_USER/" /etc/group
+        sed -i "s/,,/,/g" /etc/group
+    else
+        echo "$grp:x:$((USER_GID + 100)):$NEW_USER" >> /etc/group
+    fi
+done
+
+# Create home directory & skel
+mkdir -p "$HOME_DIR/.config/openbox" "$HOME_DIR/.local/share" "$HOME_DIR/.cache"
+
+# Copy Openbox retro desktop configs if available
+if [ -d /root/.config/openbox ]; then
+    cp -a /root/.config/openbox/* "$HOME_DIR/.config/openbox/" 2>/dev/null || :
+fi
+if [ ! -e "$HOME_DIR/.config/openbox/rc.xml" ]; then
+    ln -sf /etc/xdg/openbox/rc.xml "$HOME_DIR/.config/openbox/rc.xml" 2>/dev/null || :
+fi
+if [ ! -e "$HOME_DIR/.config/openbox/menu.xml" ]; then
+    ln -sf /etc/xdg/openbox/menu.xml "$HOME_DIR/.config/openbox/menu.xml" 2>/dev/null || :
+fi
+
+# Create default .profile
+cat > "$HOME_DIR/.profile" << EOF
+export SHELL=/bin/sh
+export USER=$NEW_USER
+export HOME=$HOME_DIR
+export PATH=/usr/share/X11/xtree/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export DISPLAY=:0
+export ENV=\$HOME/.profile
+EOF
+
+# Set ownership and permissions
+chown -R "$NEXT_UID:$USER_GID" "$HOME_DIR"
+chmod 0750 "$HOME_DIR"
+
+echo "FreeLinX: User '$NEW_USER' created (UID: $NEXT_UID, GID: $USER_GID)."
+echo "Groups: $(id -Gn "$NEW_USER" 2>/dev/null || echo "wheel, video, audio, input, disk")"
+
+# Prompt to set password
+if command -v passwd >/dev/null 2>&1; then
+    echo "Setting password for '$NEW_USER':"
+    passwd "$NEW_USER" || echo "Note: Password can be set later with 'passwd $NEW_USER'."
+fi

@@ -1,0 +1,70 @@
+#!/bin/sh
+# FreeLinX USB & Removable Storage Auto-Mounter
+# Invoked by mdevd / mdev upon block device addition or removal.
+#
+# Copyright (c) 2026 FreeLinX OS Project.
+# SPDX-License-Identifier: BSD-2-Clause
+
+set -e
+
+MDEV="${MDEV:-$1}"
+ACTION="${ACTION:-add}"
+
+[ -z "$MDEV" ] && exit 0
+
+DEVNODE="/dev/$MDEV"
+MNTPOINT="/media/$MDEV"
+
+log_msg() {
+    echo "FreeLinX automount: $1" >&2
+    [ -w /dev/ttyS0 ] && echo "FreeLinX automount: $1" > /dev/ttyS0 2>/dev/null || :
+}
+
+case "$ACTION" in
+    add)
+        [ -b "$DEVNODE" ] || exit 0
+
+        # Ignore non-partitioned raw disks if partitions exist
+        if [ -d "/sys/class/block/$MDEV" ]; then
+            # If disk has partitions and this is the root disk itself, don't mount raw disk
+            if ls "/sys/class/block/$MDEV/"* >/dev/null 2>&1; then
+                for sub in "/sys/class/block/$MDEV/"*"$MDEV"*; do
+                    [ -d "$sub" ] && exit 0 || :
+                done
+            fi
+        fi
+
+        # Determine filesystem type
+        FSTYPE=""
+        if command -v blkid >/dev/null 2>&1; then
+            FSTYPE=$(blkid "$DEVNODE" 2>/dev/null | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
+        fi
+
+        mkdir -p "$MNTPOINT"
+        MOUNT_OPTS="defaults,noatime,nodev,nosuid"
+
+        if [ "$FSTYPE" = "vfat" ] || [ "$FSTYPE" = "fat" ]; then
+            MOUNT_OPTS="$MOUNT_OPTS,umask=000,iocharset=utf8"
+        elif [ "$FSTYPE" = "ntfs" ]; then
+            MOUNT_OPTS="$MOUNT_OPTS,umask=000"
+        fi
+
+        if mount -o "$MOUNT_OPTS" "$DEVNODE" "$MNTPOINT" 2>/dev/null; then
+            log_msg "Mounted $DEVNODE ($FSTYPE) -> $MNTPOINT"
+        else
+            rmdir "$MNTPOINT" 2>/dev/null || :
+        fi
+        ;;
+
+    remove)
+        if grep -qs "$MNTPOINT" /proc/mounts; then
+            umount -l "$MNTPOINT" 2>/dev/null || :
+            rmdir "$MNTPOINT" 2>/dev/null || :
+            log_msg "Unmounted $MNTPOINT"
+        else
+            rmdir "$MNTPOINT" 2>/dev/null || :
+        fi
+        ;;
+esac
+
+exit 0

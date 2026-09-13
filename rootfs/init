@@ -1,50 +1,151 @@
 #!/bin/sh
-# FreeLinX /init - EARLY BOOTSTRAP PLACEHOLDER, NOT THE FINAL INIT.
+# FreeLinX /init - runit-based init with a bootstrap rescue fallback.
 #
-# The intended final init is a lightweight runit-based integration
-# (/sbin/runsvdir supervising /var/service). Until that (and the statically
-# linked runit binaries it needs) exist, this placeholder is installed so the
-# system has a well-defined boot entry point.
-#
-# Constraints:
-#   - POSIX /bin/sh only; no bash, no coreutils-only syntax.
-#   - Must keep working even when /bin/sh is an early statically linked
-#     shell. The build framework never executes this file; it is staged for
-#     when the target actually boots.
-#   - Mounts are best-effort: a real init will handle errors properly.
+# pid 1: mount the pseudo filesystems, bring up the hostname, then exec
+# runsvdir to supervise the services in /var/service (dbus, ..., X/Openbox
+# session). If runsvdir is missing we drop to a rescue shell.
 
 set -eu
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 export PATH
-TERM=xterm
-export TERM
-HOME=/root
-export HOME
-PS1='\w # '
-export PS1
 
-mount_pseudo() {
-    mount -t proc     proc /proc 2>/dev/null || :
-    mount -t sysfs    sys  /sys   2>/dev/null || :
-    mount -t devtmpfs dev  /dev   2>/dev/null || :
-}
+# FreeLinX default interactive shell for terminals (sakura/GTK apps read $SHELL).
+export SHELL=/bin/sh
+export TERM=xterm
+export USER=root
+export LOGNAME=root
+export HOME=/root
+export ENV=/etc/profile
+# FreeLinX single session bus address (dbus service listens here).
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
 
-# Preferred path: runit service supervision, once available.
-if [ -x /sbin/runsvdir ] && [ -d /var/service ]; then
-    mount_pseudo
+umask 022
+
+# --- pseudo filesystems -----------------------------------------------------
+mount -t proc     proc     /proc 2>/dev/null || :
+mount -t sysfs    sysfs    /sys   2>/dev/null || :
+mount -t devtmpfs devtmpfs /dev   2>/dev/null || :
+mkdir -p /dev/pts /run/user /dev/shm
+mount -t devpts -o gid=5,mode=0620,ptmxmode=0666 devpts /dev/pts 2>/dev/null || :
+rm -f /dev/ptmx && ln -s /dev/pts/ptmx /dev/ptmx
+mount -t tmpfs    tmpfs    /run   2>/dev/null || :
+
+# --- Device Manager (mdevd) & Driver Auto-Probe ------------------------------
+if [ -x /sbin/mdevd ]; then
+    /sbin/mdevd -f /etc/mdev.conf >/dev/null 2>&1 &
+    if [ -x /sbin/mdevd-coldplug ]; then
+        /sbin/mdevd-coldplug >/dev/null 2>&1 || :
+    fi
+fi
+if [ -x /sbin/flx-driver ]; then
+    /sbin/flx-driver probe >/dev/null 2>&1 || :
+fi
+
+# --- Input devices (evdev) ---------------------------------------------------
+# Map keyboards and mouse/tablet evdev nodes to /dev/fl-kbd and /dev/fl-pointer
+# for Xorg evdev driver.
+rm -f /dev/fl-kbd /dev/fl-pointer
+NAME=""
+FOUND_TABLET=""
+FOUND_MOUSE=""
+FOUND_KBD=""
+if [ -r /proc/bus/input/devices ]; then
+    while IFS= read -r line; do
+        case "$line" in
+            I:*)
+                NAME=""
+                ;;
+            N:\ Name=\"*)
+                NAME="${line#N: Name=\"}"
+                NAME="${NAME%\"}"
+                ;;
+            H:\ Handlers=*)
+                for h in ${line#H: Handlers=}; do
+                    case "$h" in
+                        event*)
+                            case "$NAME" in
+                                *[Kk]eyboard*)
+                                    [ -z "$FOUND_KBD" ] && FOUND_KBD="/dev/input/$h"
+                                    ;;
+                                *[Tt]ablet*)
+                                    FOUND_TABLET="/dev/input/$h"
+                                    ;;
+                                *[Mm]ouse*|*[Ee]xplorer*|*[Tt]ouchpad*)
+                                    [ -z "$FOUND_MOUSE" ] && FOUND_MOUSE="/dev/input/$h"
+                                    ;;
+                            esac
+                            ;;
+                    esac
+                done
+                ;;
+        esac
+    done < /proc/bus/input/devices
+fi
+
+if [ -n "$FOUND_KBD" ]; then
+    ln -sf "$FOUND_KBD" /dev/fl-kbd
+fi
+if [ -n "$FOUND_TABLET" ] && [ -n "$FOUND_MOUSE" ]; then
+    ln -sf "$FOUND_TABLET" /dev/fl-pointer
+    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
+elif [ -n "$FOUND_TABLET" ]; then
+    ln -sf "$FOUND_TABLET" /dev/fl-pointer
+    ln -sf "$FOUND_TABLET" /dev/fl-pointer2
+elif [ -n "$FOUND_MOUSE" ]; then
+    ln -sf "$FOUND_MOUSE" /dev/fl-pointer
+    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
+fi
+
+if [ ! -e /dev/fl-kbd ]; then
+    for ev in /dev/input/event*; do
+        [ -e "$ev" ] || continue
+        ln -sf "$ev" /dev/fl-kbd
+        break
+    done
+fi
+if [ ! -e /dev/fl-pointer ]; then
+    for ev in /dev/input/event*; do
+        [ -e "$ev" ] || continue
+        if [ "$ev" != "$(readlink /dev/fl-kbd 2>/dev/null)" ]; then
+            ln -sf "$ev" /dev/fl-pointer
+            break
+        fi
+    done
+fi
+if [ ! -e /dev/fl-pointer2 ] && [ -e /dev/fl-pointer ]; then
+    ln -sf "$(readlink /dev/fl-pointer)" /dev/fl-pointer2
+fi
+
+# --- XKB defaults (kept for GTK apps / X clients; the X server itself is
+# configured through xorg.conf, so do NOT export these before X starts) ------
+# XKB_DEFAULT_RULES/MODEL/LAYOUT are intentionally used by applications only.
+
+# --- Networking -------------------------------------------------------------
+/sbin/ifconfig lo 127.0.0.1 up 2>/dev/null || /sbin/flx-ifconfig lo up 2>/dev/null || :
+/sbin/flx-ifconfig eth0 inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
+/sbin/flx-ifconfig eth0 up 2>/dev/null || :
+/sbin/flx-route add default 10.0.2.2 2>/dev/null || /sbin/route add default gw 10.0.2.2 2>/dev/null || :
+printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+/sbin/dhcpcd -q -b eth0 2>/dev/null || :
+
+# --- hostname ---------------------------------------------------------------
+_hostname=""
+if [ -r /etc/hostname ]; then
+    _hostname=$(cat /etc/hostname 2>/dev/null | tr -d '[:space:]')
+fi
+[ -n "$_hostname" ] && hostname "$_hostname"
+
+# --- runit service supervision -----------------------------------------------
+if [ -x /sbin/runsvdir ]; then
+    mkdir -p /var/service
     exec /sbin/runsvdir -P /var/service
 fi
 
-mount_pseudo
-
-# Fallback: rescue shell.
+# --- rescue fallback ----------------------------------------------------------
+echo "FreeLinX: runsvdir not found - starting rescue shell." >&2
 if [ -x /bin/sh ]; then
-    echo "FreeLinX: no init supervisor installed; starting rescue shell." >&2
     exec /bin/sh
 fi
-
-echo "FreeLinX: boot failed - no init supervisor and no rescue shell available." >&2
-while :; do
-    sleep 1
-done
+echo "FreeLinX: no rescue shell available." >&2
+while :; do sleep 1; done

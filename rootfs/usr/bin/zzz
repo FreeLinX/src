@@ -1,0 +1,35 @@
+#!/bin/sh
+# zzz - BSD-style Suspend to RAM utility for FreeLinX
+# Copyright (c) 2026 FreeLinX OS Project.
+# SPDX-License-Identifier: BSD-2-Clause
+
+set -e
+
+if [ "$(id -u)" -ne 0 ]; then
+    if command -v doas >/dev/null 2>&1; then
+        exec doas "$0" "$@"
+    else
+        echo "zzz: must be run as root or via doas" >&2
+        exit 1
+    fi
+fi
+
+echo "FreeLinX: Suspending system to RAM..."
+sync
+
+# Lock screen if retro desktop helper is running
+if [ -n "$DISPLAY" ] && command -v xsetroot >/dev/null 2>&1; then
+    xsetroot -cursor_name watch 2>/dev/null || :
+fi
+
+if [ -w /sys/power/state ]; then
+    echo mem > /sys/power/state
+else
+    echo "zzz: /sys/power/state not writable" >&2
+    exit 1
+fi
+
+echo "FreeLinX: Resumed from sleep."
+if [ -n "$DISPLAY" ] && command -v xsetroot >/dev/null 2>&1; then
+    xsetroot -cursor_name left_ptr 2>/dev/null || :
+fi

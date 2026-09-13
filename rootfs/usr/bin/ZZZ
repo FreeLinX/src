@@ -1,0 +1,25 @@
+#!/bin/sh
+# ZZZ - BSD-style Hibernate (suspend-to-disk) utility for FreeLinX
+# Copyright (c) 2026 FreeLinX OS Project.
+# SPDX-License-Identifier: BSD-2-Clause
+
+set -e
+
+if [ "$(id -u)" -ne 0 ]; then
+    if command -v doas >/dev/null 2>&1; then
+        exec doas "$0" "$@"
+    else
+        echo "ZZZ: must be run as root or via doas" >&2
+        exit 1
+    fi
+fi
+
+echo "FreeLinX: Hibernating system to disk..."
+sync
+
+if [ -w /sys/power/state ]; then
+    echo disk > /sys/power/state
+else
+    echo "ZZZ: /sys/power/state not writable" >&2
+    exit 1
+fi
