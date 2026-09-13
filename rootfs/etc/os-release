@@ -1,9 +1,10 @@
 NAME=FreeLinX
 ID=freelinx
-VERSION_ID="0.0-dev"
-PRETTY_NAME="FreeLinX 0.0-dev (bootstrap)"
+VERSION="1.0"
+VERSION_ID="1.0-rio"
+PRETTY_NAME="FreeLinX 1.0 (Rio Workstation Edition)"
 ANSI_COLOR="1;36"
-BUILD_ID="bootstrap"
-HOME_URL=
-SUPPORT_URL=
-BUG_REPORT_URL=
+BUILD_ID="rio-release"
+HOME_URL="https://github.com/FreeLinX"
+SUPPORT_URL="https://github.com/FreeLinX"
+BUG_REPORT_URL="https://github.com/FreeLinX"
