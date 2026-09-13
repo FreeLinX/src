@@ -1,0 +1,7 @@
+#!/bin/sh
+echo "FreeLinX Window Properties (Openbox 3.6.1)"
+echo "Display: $DISPLAY"
+echo "Resolution: 1024x768 @ 60 FPS (ShadowFB enabled)"
+echo "Driver: fbdev + libshadowfb (Accelerated)"
+echo ""
+read -p "Press Enter to exit..." dummy

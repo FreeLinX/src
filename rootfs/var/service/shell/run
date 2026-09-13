@@ -1,0 +1,3 @@
+#!/bin/sh
+[ -e /dev/ttyS1 ] || exit 1
+exec /bin/sh -l < /dev/ttyS1 > /dev/ttyS1 2>&1

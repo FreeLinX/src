@@ -40,3 +40,4 @@ kernel/net/netfilter/xt_LOG.ko:
 kernel/net/netfilter/xt_MASQUERADE.ko:
 kernel/net/netfilter/xt_addrtype.ko:
 kernel/net/ipv4/netfilter/iptable_nat.ko:
+kernel/drivers/misc/flx_dummy.ko:

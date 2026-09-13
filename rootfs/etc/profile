@@ -1,0 +1,23 @@
+# FreeLinX System Profile
+export PATH=/usr/share/X11/xtree/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
+export TERM=xterm-256color
+export SHELL=/bin/sh
+
+_UID=$(id -u 2>/dev/null || echo 0)
+if [ "$_UID" -eq 0 ]; then
+    export USER=root
+    export LOGNAME=root
+    export HOME=/root
+    export PS1="root@freelinx:~# "
+else
+    _UNAME=$(id -un 2>/dev/null || whoami 2>/dev/null || echo user)
+    export USER="$_UNAME"
+    export LOGNAME="$_UNAME"
+    export HOME="/home/$_UNAME"
+    export PS1="$_UNAME@freelinx:~$ "
+fi
+unset _UID _UNAME
+
+HOSTNAME=$(cat /etc/hostname 2>/dev/null || echo freelinx)
+export HOSTNAME
+export ENV=/etc/profile

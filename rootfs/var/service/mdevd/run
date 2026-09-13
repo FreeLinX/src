@@ -1,0 +1,3 @@
+#!/bin/sh
+# FreeLinX mdevd uevent device manager service
+exec /sbin/mdevd -f /etc/mdev.conf

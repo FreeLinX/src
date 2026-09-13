@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FreeLinX Operating System</title>
+  <style>
+    body {
+      background-color: #2b4f6e;
+      color: #000000;
+      font-family: sans-serif, Helvetica, Arial;
+      margin: 20px;
+    }
+    .container {
+      background-color: #f0f0ee;
+      border: 2px solid #ffffff;
+      border-right: 2px solid #555555;
+      border-bottom: 2px solid #555555;
+      padding: 16px;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+    .header {
+      background: #103050;
+      color: #ffffff;
+      padding: 10px 15px;
+      border: 1px solid #000000;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+    .header p {
+      margin: 4px 0 0 0;
+      font-size: 12px;
+      color: #a0c4e8;
+    }
+    .box {
+      background: #e8e8e4;
+      border: 1px solid #888888;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .box h2 {
+      margin-top: 0;
+      font-size: 15px;
+      border-bottom: 1px solid #aaaaaa;
+      padding-bottom: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid #cccccc;
+      padding: 6px 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #dcdcd8;
+    }
+    a {
+      color: #003399;
+      font-weight: bold;
+      text-decoration: underline;
+    }
+    a:hover {
+      color: #cc0000;
+    }
+    .footer {
+      font-size: 11px;
+      color: #555555;
+      text-align: center;
+      margin-top: 15px;
+      border-top: 1px solid #cccccc;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>FreeLinX Operating System</h1>
+    <p>Independent &bull; Non-GNU &bull; Musl libc &bull; Lightweight Retro Desktop</p>
+  </div>
+
+  <div class="box" style="text-align: center; padding: 16px; background: #e0e8f0; border: 2px solid #507090;">
+    <h2 style="border: none; margin-bottom: 10px;">Web Search (DuckDuckGo Lite)</h2>
+    <form action="https://duckduckgo.com/lite/" method="get">
+      <input type="text" name="q" size="40" placeholder="Enter search keywords here...">
+      <input type="submit" value="Search">
+    </form>
+  </div>
+
+  <div class="box">
+    <h2>Welcome to FreeLinX Graphical Web Browser</h2>
+    <p>You are running the native <b>Links Graphical Browser</b> with full X11 rendering, SSL/TLS security, image support, and table formatting.</p>
+  </div>
+
+  <div class="box">
+    <h2>Quick Navigation & Web Resources</h2>
+    <ul>
+      <li><a href="https://duckduckgo.com/lite">DuckDuckGo (Lite HTML Search)</a></li>
+      <li><a href="https://lite.cnn.com">CNN Lite (Low-bandwidth News)</a></li>
+      <li><a href="https://text.npr.org">NPR Text-Only News</a></li>
+      <li><a href="https://news.ycombinator.com">Hacker News</a></li>
+      <li><a href="https://github.com/FreeLinX">FreeLinX Project on GitHub</a></li>
+      <li><a href="http://links.twibright.com">Twibright Links Browser Homepage</a></li>
+    </ul>
+  </div>
+
+  <div class="box">
+    <h2>Built-in Applications & Tools</h2>
+    <table>
+      <tr>
+        <th>Tool</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td><b>links -g</b></td>
+        <td>Graphical Browser</td>
+        <td>Native non-GNU graphical browser with SSL/TLS</td>
+      </tr>
+      <tr>
+        <td><b>flx-netmgr</b></td>
+        <td>Network Manager</td>
+        <td>Graphical WiFi & Ethernet configuration tool</td>
+      </tr>
+      <tr>
+        <td><b>uxterm / st</b></td>
+        <td>Terminal</td>
+        <td>High-performance X11 terminal emulator</td>
+      </tr>
+      <tr>
+        <td><b>vim</b></td>
+        <td>Editor</td>
+        <td>Advanced text and code editor</td>
+      </tr>
+      <tr>
+        <td><b>xeyes</b></td>
+        <td>Utility</td>
+        <td>Classic X11 mouse tracking accessory</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="box">
+    <h2>Network Controls</h2>
+    <p>To connect to the Internet or manage WiFi:</p>
+    <ul>
+      <li>Open <b>Network Manager</b> from the desktop menu (or run <code>flx-netmgr</code>).</li>
+      <li>Or use terminal commands: <code>flx-wifi scan</code>, <code>flx-wifi connect "SSID" "pass"</code>.</li>
+      <li>Dynamic DHCP: <code>dhcpcd eth0</code>.</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    FreeLinX Operating System &bull; 100% Non-GNU Musl Desktop &bull; 2026
+  </div>
+</div>
+
+</body>
+</html>

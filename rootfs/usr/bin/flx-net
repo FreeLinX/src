@@ -1,0 +1,86 @@
+#!/bin/sh
+# FreeLinX CLI Network Tool (non-GNU)
+set -e
+
+show_menu() {
+    clear
+    echo "================================================="
+    echo "      FreeLinX Network Manager (non-GNU)        "
+    echo "================================================="
+    echo ""
+    echo " Interfaces:"
+    /sbin/flx-ifconfig 2>/dev/null | grep -E '^[a-z0-9]+|inet ' || ip addr 2>/dev/null || true
+    echo ""
+    echo " Default Gateway:"
+    route -n 2>/dev/null | grep '^0.0.0.0' || echo "  (none)"
+    echo ""
+    echo " DNS Servers (/etc/resolv.conf):"
+    grep nameserver /etc/resolv.conf 2>/dev/null || echo "  (none)"
+    echo ""
+    echo "-------------------------------------------------"
+    echo " 1) Scan WiFi Networks"
+    echo " 2) Connect to WiFi Network"
+    echo " 3) Disconnect WiFi"
+    echo " 4) Renew DHCP (eth0 / wlan0)"
+    echo " 5) Ping Test (1.1.1.1)"
+    echo " 6) Exit"
+    echo "-------------------------------------------------"
+    printf " Select an option [1-6]: "
+}
+
+while true; do
+    show_menu
+    read -r choice
+    case "$choice" in
+        1)
+            echo ""
+            echo "Scanning WiFi networks..."
+            /sbin/flx-wifi scan || echo "WiFi scan failed (is wlan0 available?)"
+            echo ""
+            read -p "Press Enter to continue..." dummy
+            ;;
+        2)
+            echo ""
+            printf "Enter SSID: "
+            read -r ssid
+            printf "Enter Password (leave empty for open): "
+            read -r pass
+            echo "Connecting to $ssid..."
+            /sbin/flx-wifi connect "$ssid" "$pass"
+            echo ""
+            read -p "Press Enter to continue..." dummy
+            ;;
+        3)
+            echo ""
+            echo "Disconnecting WiFi..."
+            /sbin/flx-wifi disconnect
+            echo "Done."
+            read -p "Press Enter to continue..." dummy
+            ;;
+        4)
+            echo ""
+            printf "Enter interface [eth0]: "
+            read -r iface
+            iface="${iface:-eth0}"
+            echo "Requesting DHCP lease on $iface..."
+            /sbin/dhcpcd -q "$iface" || echo "dhcpcd failed"
+            echo ""
+            read -p "Press Enter to continue..." dummy
+            ;;
+        5)
+            echo ""
+            echo "Testing ping to 1.1.1.1..."
+            ping -c 3 1.1.1.1 || echo "Ping failed!"
+            echo ""
+            read -p "Press Enter to continue..." dummy
+            ;;
+        6|q|exit)
+            echo "Goodbye."
+            exit 0
+            ;;
+        *)
+            echo "Invalid choice."
+            sleep 1
+            ;;
+    esac
+done

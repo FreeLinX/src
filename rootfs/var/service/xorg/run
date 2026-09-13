@@ -1,0 +1,129 @@
+#!/bin/sh
+# FreeLinX X11 desktop: start Xorg on /dev/fb0, then openbox.
+mkdir -p /tmp/.X11-unix /var/lib/xkb 2>/dev/null || true
+chmod 1777 /tmp/.X11-unix 2>/dev/null || true
+
+# Kill any leftover Xorg/openbox from a previous runit cycle so the new
+# service never fights stale processes (lock, WM, or device handles).
+for p in /proc/[0-9]*; do
+    [ -r "$p/cmdline" ] || continue
+    cmd=$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null) || continue
+    case "$cmd" in
+        *"Xorg"*|*"openbox"*) kill -9 "${p#/proc/}" 2>/dev/null || true ;;
+    esac
+done
+
+# Never let a previous incarnation hold the display lock.
+rm -f /tmp/.X0-lock /tmp/.X11-unix/X0
+
+# Map the evdev input devices to /dev/fl-kbd and /dev/fl-pointer for Xorg
+NAME=""
+FOUND_TABLET=""
+FOUND_MOUSE=""
+FOUND_KBD=""
+if [ -r /proc/bus/input/devices ]; then
+    while IFS= read -r line; do
+        case "$line" in
+            I:*)
+                NAME=""
+                ;;
+            N:\ Name=\"*)
+                NAME="${line#N: Name=\"}"
+                NAME="${NAME%\"}"
+                ;;
+            H:\ Handlers=*)
+                for h in ${line#H: Handlers=}; do
+                    case "$h" in
+                        event*)
+                            case "$NAME" in
+                                *[Kk]eyboard*)
+                                    [ -z "$FOUND_KBD" ] && FOUND_KBD="/dev/input/$h"
+                                    ;;
+                                *[Tt]ablet*)
+                                    FOUND_TABLET="/dev/input/$h"
+                                    ;;
+                                *[Mm]ouse*|*[Ee]xplorer*|*[Tt]ouchpad*)
+                                    [ -z "$FOUND_MOUSE" ] && FOUND_MOUSE="/dev/input/$h"
+                                    ;;
+                            esac
+                            ;;
+                    esac
+                done
+                ;;
+        esac
+    done < /proc/bus/input/devices
+fi
+
+if [ -n "$FOUND_KBD" ]; then
+    ln -sf "$FOUND_KBD" /dev/fl-kbd
+fi
+if [ -n "$FOUND_TABLET" ] && [ -n "$FOUND_MOUSE" ]; then
+    ln -sf "$FOUND_TABLET" /dev/fl-pointer
+    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
+elif [ -n "$FOUND_TABLET" ]; then
+    ln -sf "$FOUND_TABLET" /dev/fl-pointer
+    ln -sf "$FOUND_TABLET" /dev/fl-pointer2
+elif [ -n "$FOUND_MOUSE" ]; then
+    ln -sf "$FOUND_MOUSE" /dev/fl-pointer
+    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
+fi
+
+if [ ! -e /dev/fl-kbd ]; then
+    for ev in /dev/input/event*; do
+        [ -e "$ev" ] || continue
+        ln -sf "$ev" /dev/fl-kbd
+        break
+    done
+fi
+if [ ! -e /dev/fl-pointer ]; then
+    for ev in /dev/input/event*; do
+        [ -e "$ev" ] || continue
+        if [ "$ev" != "$(readlink /dev/fl-kbd 2>/dev/null)" ]; then
+            ln -sf "$ev" /dev/fl-pointer
+            break
+        fi
+    done
+fi
+if [ ! -e /dev/fl-pointer2 ] && [ -e /dev/fl-pointer ]; then
+    ln -sf "$(readlink /dev/fl-pointer)" /dev/fl-pointer2
+fi
+if [ ! -e /dev/fb0 ]; then mknod /dev/fb0 c 29 0 2>/dev/null || true; fi
+echo "FreeLinX Input: kbd=$(readlink /dev/fl-kbd) pointer=$(readlink /dev/fl-pointer) pointer2=$(readlink /dev/fl-pointer2)" > /dev/ttyS0
+
+Xorg -config /etc/X11/xorg.conf -noreset -nolisten tcp -logfile /tmp/xorg.log > /dev/ttyS0 2>&1 &
+XPID=$!
+
+i=0
+while [ ! -e /tmp/.X11-unix/X0 ] && kill -0 "$XPID" 2>/dev/null && [ "$i" -lt 100 ]; do
+    sleep 0.1
+    i=$((i+1))
+done
+
+if [ ! -e /tmp/.X11-unix/X0 ]; then
+    echo "=== Xorg failed to start on :0 ===" > /dev/ttyS0
+    echo "=== /dev/fb* ===" > /dev/ttyS0
+    ls -la /dev/fb* /dev/dri/* > /dev/ttyS0 2>&1 || true
+    echo "=== dmesg DRM/FB ===" > /dev/ttyS0
+    dmesg | grep -i -E "drm|fb|virtio" > /dev/ttyS0 2>&1 || true
+    echo "=== /tmp/xorg.log ===" > /dev/ttyS0
+    cat /tmp/xorg.log > /dev/ttyS0 2>&1 || true
+    exit 1
+fi
+
+echo "=== Xorg Full Log ===" > /dev/ttyS0
+cat /tmp/xorg.log > /dev/ttyS0 2>&1 || true
+
+export DISPLAY=:0
+export HOME=/root
+export USER=root
+export ENV=/etc/profile
+export XDG_CONFIG_HOME=/root/.config
+export XDG_DATA_HOME=/root/.local/share
+export XDG_CACHE_HOME=/root/.cache
+export PATH=/usr/share/X11/xtree/bin:/usr/bin:/bin:/usr/sbin:/sbin
+mkdir -p "$XDG_CONFIG_HOME/openbox"
+
+# Run the openbox desktop shell with the autostart helper
+( exec /usr/share/X11/xtree/bin/openbox --startup "/usr/lib/openbox/openbox-autostart OPENBOX" 2>&1 | tee -a /tmp/openbox.log > /dev/ttyS0 ) &
+wait "$XPID"
+exit 0

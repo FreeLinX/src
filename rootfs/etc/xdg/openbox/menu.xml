@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+
+<menu id="terminals-menu" label="Terminals">
+  <item label="UXTerm / ST">
+    <action name="Execute"><command>uxterm -e /bin/sh -l</command></action>
+  </item>
+  <item label="URxvt (rxvt-unicode)">
+    <action name="Execute"><command>urxvt -e /bin/sh -l</command></action>
+  </item>
+</menu>
+
+<menu id="files-menu" label="Files">
+  <item label="File Manager (flx-fm)">
+    <action name="Execute"><command>flx-fm</command></action>
+  </item>
+  <item label="Browse /root (Terminal)">
+    <action name="Execute"><command>uxterm -e sh -c "cd /root; ls -la; exec /bin/sh -l"</command></action>
+  </item>
+</menu>
+
+<menu id="editors-menu" label="Editors">
+  <item label="Vim">
+    <action name="Execute"><command>uxterm -e vim</command></action>
+  </item>
+</menu>
+
+<menu id="graphics-menu" label="Graphics">
+  <item label="3D OpenGL Gears (glxgears)">
+    <action name="Execute"><command>glxgears</command></action>
+  </item>
+  <item label="3D GPU Realtime Test (flx-3dtest)">
+    <action name="Execute"><command>uxterm -e flx-3dtest</command></action>
+  </item>
+  <item label="GPU 3D &amp; DRM Diagnostics">
+    <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver gpu; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+</menu>
+
+<menu id="games-menu" label="Games">
+  <item label="Classic Doom">
+    <action name="Execute"><command>doom</command></action>
+  </item>
+</menu>
+
+<menu id="network-menu" label="Network">
+  <item label="Network Manager (CLI)">
+    <action name="Execute"><command>uxterm -e flx-net</command></action>
+  </item>
+  <item label="Links Web Browser">
+    <action name="Execute"><command>flx-browser</command></action>
+  </item>
+  <item label="w3m Text Browser">
+    <action name="Execute"><command>uxterm -e w3m https://duckduckgo.com</command></action>
+  </item>
+</menu>
+
+<menu id="sound-menu" label="Sound">
+  <item label="TinyALSA Mixer (tinymix)">
+    <action name="Execute"><command>uxterm -e sh -c "/usr/bin/tinymix; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Audio Cards &amp; Endpoints">
+    <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver audio; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+</menu>
+
+<menu id="power-menu" label="Power &amp; Battery">
+  <item label="Hardware &amp; Power Status">
+    <action name="Execute"><command>uxterm -e sh -c "/usr/bin/flx-power status; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Set Governor: Performance">
+    <action name="Execute"><command>uxterm -e sh -c "doas /usr/bin/flx-power governor performance; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Set Governor: Powersave">
+    <action name="Execute"><command>uxterm -e sh -c "doas /usr/bin/flx-power governor powersave; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Suspend to RAM (Sleep)">
+    <action name="Execute"><command>zzz</command></action>
+  </item>
+</menu>
+
+<menu id="system-app-menu" label="System">
+  <item label="Install FreeLinX to Disk">
+    <action name="Execute"><command>uxterm -e sh -c "doas /sbin/flx-install; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Hardware Inventory (flx-driver scan)">
+    <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver scan; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Driver Auto-Prober (flx-driver probe)">
+    <action name="Execute"><command>uxterm -e sh -c "doas /sbin/flx-driver probe; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="System Information (pfetch)">
+    <action name="Execute"><command>uxterm -e sh -c "pfetch; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+</menu>
+
+<menu id="tools-menu" label="Tools">
+  <item label="Xeyes">
+    <action name="Execute"><command>xeyes</command></action>
+  </item>
+  <item label="Xmag (Magnifier)">
+    <action name="Execute"><command>xmag</command></action>
+  </item>
+</menu>
+
+<menu id="applications-menu" label="Applications">
+  <menu id="terminals-menu" />
+  <menu id="files-menu" />
+  <menu id="editors-menu" />
+  <menu id="games-menu" />
+  <menu id="graphics-menu" />
+  <menu id="network-menu" />
+  <menu id="sound-menu" />
+  <menu id="power-menu" />
+  <menu id="system-app-menu" />
+  <menu id="tools-menu" />
+</menu>
+
+<menu id="root-menu" label="FreeLinX">
+  <item label="Terminal Emulator (uxterm)">
+    <action name="Execute">
+      <command>uxterm -e /bin/sh -l</command>
+    </action>
+  </item>
+
+  <item label="Terminal Emulator (urxvt)">
+    <action name="Execute">
+      <command>urxvt -e /bin/sh -l</command>
+    </action>
+  </item>
+
+  <item label="File Manager (flx-fm)">
+    <action name="Execute">
+      <command>flx-fm</command>
+    </action>
+  </item>
+
+  <item label="Web Browser">
+    <action name="Execute">
+      <command>flx-browser</command>
+    </action>
+  </item>
+
+  <separator />
+
+  <menu id="applications-menu" />
+
+  <separator />
+
+  <menu id="client-list-combined-menu" label="Workspaces" />
+
+  <item label="Reconfigure">
+    <action name="Reconfigure" />
+  </item>
+
+  <item label="Restart">
+    <action name="Restart" />
+  </item>
+
+  <item label="Exit">
+    <action name="Exit">
+      <prompt>yes</prompt>
+    </action>
+  </item>
+</menu>
+
+</openbox_menu>
