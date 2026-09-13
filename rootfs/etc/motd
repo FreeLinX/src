@@ -1,0 +1,14 @@
+  ______              _      _         _  __
+ |  ____|            | |    (_)       | |/ /
+ | |__ _ __ ___  ___ | |     _ _ __   | ' / 
+ |  __| '__/ _ \/ _ \| |    | | '_ \  |  <  
+ | |  | | |  __/  __/| |____| | | | | | . \ 
+ |_|  |_|  \___|\___||______|_|_| |_| |_|\_\
+
+ FreeLinX 1.0 (Rio Workstation Edition) - Static Musl / Linux 6.6
+ Authentic 1990s Plan 9 Rio Desktop Environment
+
+ * Right-click desktop for applications and workspace menu.
+ * Run 'flx-install' as root to install FreeLinX to disk.
+ * Source & Issue tracker: https://github.com/FreeLinX
+

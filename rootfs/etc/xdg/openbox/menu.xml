@@ -8,6 +8,9 @@
   <item label="URxvt (rxvt-unicode)">
     <action name="Execute"><command>urxvt -e /bin/sh -l</command></action>
   </item>
+  <item label="tmux (Terminal Multiplexer)">
+    <action name="Execute"><command>uxterm -T "tmux session" -e tmux</command></action>
+  </item>
 </menu>
 
 <menu id="files-menu" label="Files">
@@ -49,6 +52,9 @@
 <menu id="games-menu" label="Games">
   <item label="Classic Doom">
     <action name="Execute"><command>doom</command></action>
+  </item>
+  <item label="BSD Tetris">
+    <action name="Execute"><command>uxterm -T "BSD Tetris" -e tetris</command></action>
   </item>
 </menu>
 
@@ -95,18 +101,39 @@
   <item label="Hardware Inventory (flx-driver scan)">
     <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver scan; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
-  <item label="Driver Auto-Prober (flx-driver probe)">
-    <action name="Execute"><command>uxterm -e sh -c "doas /sbin/flx-driver probe; echo; printf 'Press Enter to close...'; read l"</command></action>
+  <item label="PCI Hardware (lspci)">
+    <action name="Execute"><command>uxterm -e sh -c "lspci -nn; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
-  <item label="System Information (pfetch)">
-    <action name="Execute"><command>uxterm -e sh -c "pfetch; echo; printf 'Press Enter to close...'; read l"</command></action>
+  <item label="USB Devices (lsusb)">
+    <action name="Execute"><command>uxterm -e sh -c "lsusb; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Disk Usage (ncdu)">
+    <action name="Execute"><command>uxterm -T "Disk Usage" -e ncdu /</command></action>
   </item>
   <item label="Process Monitor (htop)">
     <action name="Execute"><command>uxterm -T "Process Monitor" -e htop</command></action>
   </item>
+  <item label="Process Tree (pstree)">
+    <action name="Execute"><command>uxterm -e sh -c "pstree; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="System Information (pfetch)">
+    <action name="Execute"><command>uxterm -e sh -c "pfetch; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
 </menu>
 
 <menu id="tools-menu" label="Tools">
+  <item label="Clock (xclock)">
+    <action name="Execute"><command>xclock</command></action>
+  </item>
+  <item label="Digital Clock">
+    <action name="Execute"><command>xclock -digital</command></action>
+  </item>
+  <item label="Calculator (bc)">
+    <action name="Execute"><command>uxterm -T "Calculator" -e sh -c "bc; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Lua 5.4 REPL">
+    <action name="Execute"><command>uxterm -T "Lua Interactive Shell" -e lua</command></action>
+  </item>
   <item label="Xeyes">
     <action name="Execute"><command>xeyes</command></action>
   </item>
