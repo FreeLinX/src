@@ -35,6 +35,9 @@
   <item label="Image Viewer (flx-view)">
     <action name="Execute"><command>flx-view</command></action>
   </item>
+  <item label="PDF Viewer (MuPDF)">
+    <action name="Execute"><command>uxterm -T "MuPDF" -e sh -c "echo 'MuPDF Document Viewer'; echo 'Usage: mupdf &lt;file.pdf&gt;'; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
   <item label="Take Screenshot (flx-shot)">
     <action name="Execute"><command>flx-shot</command></action>
   </item>
@@ -76,7 +79,10 @@
   </item>
 </menu>
 
-<menu id="sound-menu" label="Sound">
+<menu id="sound-menu" label="Sound &amp; Video">
+  <item label="Media Player (mpv)">
+    <action name="Execute"><command>uxterm -T "mpv" -e sh -c "mpv --help; echo; printf 'Usage: mpv &lt;file/url&gt;\nPress Enter to close...'; read l"</command></action>
+  </item>
   <item label="MPEG Audio Player (mpg123)">
     <action name="Execute"><command>uxterm -T "Audio Player" -e sh -c "mpg123 --help; echo; printf 'Usage: mpg123 &lt;file.mp3&gt;\nPress Enter to close...'; read l"</command></action>
   </item>
@@ -104,6 +110,12 @@
 </menu>
 
 <menu id="system-app-menu" label="System">
+  <item label="Display Resolution (xrandr)">
+    <action name="Execute"><command>uxterm -T "Display Resolution" -e sh -c "xrandr; echo; printf 'Usage: xrandr -s &lt;width&gt;x&lt;height&gt;\nPress Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Keyboard Layout (AZ/US) (setxkbmap)">
+    <action name="Execute"><command>uxterm -T "Keyboard Layout" -e sh -c "setxkbmap us,az -option grp:alt_shift_toggle &amp;&amp; echo 'Keyboard layout set to US/AZ (toggle: Alt+Shift)'; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
   <item label="Install FreeLinX to Disk">
     <action name="Execute"><command>uxterm -e sh -c "doas /sbin/flx-install; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
