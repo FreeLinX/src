@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Links Web Browser
+Comment=Fast and lightweight graphical web browser
+Exec=links -g %u
+Terminal=false
+Type=Application
+Icon=text-html
+Categories=Network;WebBrowser;

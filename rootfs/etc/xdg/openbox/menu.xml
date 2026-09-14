@@ -65,8 +65,11 @@
   <item label="Dillo Web Browser">
     <action name="Execute"><command>dillo</command></action>
   </item>
-  <item label="Links Web Browser">
-    <action name="Execute"><command>flx-browser</command></action>
+  <item label="Links Web Browser (Graphics)">
+    <action name="Execute"><command>links -g</command></action>
+  </item>
+  <item label="Links Text Browser (Console)">
+    <action name="Execute"><command>uxterm -e links</command></action>
   </item>
   <item label="w3m Text Browser">
     <action name="Execute"><command>uxterm -e w3m https://duckduckgo.com</command></action>
@@ -191,7 +194,13 @@
 
   <item label="Web Browser (Dillo)">
     <action name="Execute">
-      <command>flx-browser</command>
+      <command>dillo</command>
+    </action>
+  </item>
+
+  <item label="Links Browser (Graphics)">
+    <action name="Execute">
+      <command>links -g</command>
     </action>
   </item>
 
