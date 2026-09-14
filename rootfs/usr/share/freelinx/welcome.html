@@ -1,393 +1,285 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <title>Welcome to FreeLinX — The 100% Independent Non-GNU Operating System</title>
-  <style type="text/css">
-    body {
-      background-color: #3a4a58;
-      color: #000000;
-      font-family: "DejaVu Sans", "Helvetica", "Arial", sans-serif;
-      margin: 16px;
-      padding: 0;
-    }
-    .main-wrapper {
-      background-color: #d4d0c8;
-      border-top: 3px solid #ffffff;
-      border-left: 3px solid #ffffff;
-      border-right: 3px solid #404040;
-      border-bottom: 3px solid #404040;
-      padding: 12px;
-      max-width: 860px;
-      margin: 0 auto;
-      box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
-    }
-    .titlebar {
-      background: #000080;
-      background: -webkit-linear-gradient(left, #000080, #1084d0);
-      color: #ffffff;
-      padding: 6px 10px;
-      font-weight: bold;
-      font-size: 15px;
-      letter-spacing: 1px;
-      border: 1px solid #000050;
-      margin-bottom: 12px;
-    }
-    .hero-banner {
-      background-color: #1a2a3a;
-      border-top: 2px solid #000000;
-      border-left: 2px solid #000000;
-      border-right: 2px solid #ffffff;
-      border-bottom: 2px solid #ffffff;
-      color: #f0f0f0;
-      padding: 16px 20px;
-      margin-bottom: 14px;
-      text-align: center;
-    }
-    .hero-banner h1 {
-      margin: 0;
-      font-size: 24px;
-      color: #40c4ff;
-      font-family: "DejaVu Serif", "Times New Roman", serif;
-      letter-spacing: 1px;
-    }
-    .hero-banner .subtitle {
-      margin: 6px 0 10px 0;
-      font-size: 14px;
-      color: #e0e0e0;
-      font-style: italic;
-    }
-    .badge-bar {
-      margin-top: 8px;
-    }
-    .badge {
-      display: inline-block;
-      background: #005577;
-      color: #ffffff;
-      font-family: monospace;
-      font-size: 11px;
-      font-weight: bold;
-      padding: 2px 7px;
-      margin: 2px 3px;
-      border-top: 1px solid #88ccff;
-      border-left: 1px solid #88ccff;
-      border-right: 1px solid #002233;
-      border-bottom: 1px solid #002233;
-    }
-    .badge-gold {
-      background: #8b6508;
-      border-top-color: #ffd700;
-      border-left-color: #ffd700;
-      border-right-color: #4a3500;
-      border-bottom-color: #4a3500;
-    }
-    .badge-green {
-      background: #1e5e2e;
-      border-top-color: #70db88;
-      border-left-color: #70db88;
-      border-right-color: #0d2e14;
-      border-bottom-color: #0d2e14;
-    }
-    .panel-box {
-      background-color: #e4e0d8;
-      border-top: 2px solid #ffffff;
-      border-left: 2px solid #ffffff;
-      border-right: 2px solid #808080;
-      border-bottom: 2px solid #808080;
-      padding: 12px 14px;
-      margin-bottom: 12px;
-    }
-    .panel-box h2 {
-      margin: 0 0 8px 0;
-      font-size: 15px;
-      color: #000080;
-      border-bottom: 2px groove #ffffff;
-      padding-bottom: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    p {
-      margin: 6px 0;
-      line-height: 1.45;
-      font-size: 13px;
-    }
-    table.retro-grid {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 2px;
-      font-size: 12px;
-      margin: 8px 0;
-    }
-    table.retro-grid th {
-      background: #000080;
-      color: #ffffff;
-      padding: 5px 8px;
-      font-weight: bold;
-      text-align: left;
-      border: 1px solid #000050;
-    }
-    table.retro-grid td {
-      background: #ffffff;
-      padding: 5px 8px;
-      border-top: 1px solid #808080;
-      border-left: 1px solid #808080;
-      border-right: 1px solid #ffffff;
-      border-bottom: 1px solid #ffffff;
-      vertical-align: middle;
-    }
-    table.retro-grid tr:hover td {
-      background: #f4f8ff;
-    }
-    .key-badge {
-      display: inline-block;
-      background: #f0f0f0;
-      color: #000000;
-      font-family: monospace;
-      font-weight: bold;
-      font-size: 11px;
-      padding: 2px 6px;
-      border-top: 2px solid #ffffff;
-      border-left: 2px solid #ffffff;
-      border-right: 2px solid #606060;
-      border-bottom: 2px solid #606060;
-    }
-    .search-box {
-      background: #c8c4b8;
-      border: 2px inset #ffffff;
-      padding: 10px;
-      text-align: center;
-      margin: 10px 0;
-    }
-    .search-input {
-      font-family: monospace;
-      font-size: 13px;
-      padding: 4px 6px;
-      border: 2px inset #ffffff;
-      background: #ffffff;
-      width: 320px;
-    }
-    .search-btn {
-      font-family: sans-serif;
-      font-size: 12px;
-      font-weight: bold;
-      padding: 3px 14px;
-      background: #d4d0c8;
-      border-top: 2px solid #ffffff;
-      border-left: 2px solid #ffffff;
-      border-right: 2px solid #404040;
-      border-bottom: 2px solid #404040;
-      cursor: pointer;
-    }
-    .code-block {
-      background: #000000;
-      color: #00ff66;
-      font-family: "DejaVu Sans Mono", monospace;
-      font-size: 12px;
-      padding: 8px 12px;
-      border: 2px inset #ffffff;
-      overflow: auto;
-      margin: 6px 0;
-    }
-    a {
-      color: #0000cc;
-      font-weight: bold;
-      text-decoration: underline;
-    }
-    a:hover {
-      color: #cc0000;
-    }
-    .status-bar {
-      background: #d4d0c8;
-      border-top: 2px groove #ffffff;
-      padding: 4px 6px;
-      font-size: 11px;
-      color: #404040;
-      display: flex;
-      justify-content: space-between;
-      margin-top: 10px;
-    }
-    hr.retro-rule {
-      border: 0;
-      height: 2px;
-      border-top: 1px solid #808080;
-      border-bottom: 1px solid #ffffff;
-      margin: 12px 0;
-    }
-  </style>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+  <title>Welcome to FreeLinX</title>
 </head>
-<body>
+<body bgcolor="#c0c0c0" text="#000000" link="#0000ee" vlink="#551a8b" alink="#ff0000">
 
-<div class="main-wrapper">
-  <div class="titlebar">
-    FreeLinX Operating System &bull; System Welcome &amp; Reference Guide
-  </div>
+<table border="0" cellpadding="4" cellspacing="0" width="100%">
+  <tr>
+    <td width="100" valign="top" align="center">
+      <img src="logo.png" width="92" height="77" alt="FreeLinX Logo" border="1">
+    </td>
+    <td valign="middle">
+      <font size="+2"><b>FreeLinX Operating System</b></font><br>
+      <font size="+1"><i>The Independent Non-GNU Workstation</i></font><br>
+      <font size="-1">Release 1.0 &bull; x86_64 &bull; Musl Libc &bull; LLVM/Clang &bull; X11 Desktop</font>
+    </td>
+  </tr>
+</table>
 
-  <div class="hero-banner">
-    <h1>Welcome to FreeLinX</h1>
-    <div class="subtitle">The 100% Independent, Non-GNU Operating System</div>
-    <div class="badge-bar">
-      <span class="badge badge-gold">100% NON-GNU</span>
-      <span class="badge">MUSL LIBC</span>
-      <span class="badge">LLVM / CLANG 21</span>
-      <span class="badge">TCC COMPILER</span>
-      <span class="badge badge-green">RAM &lt; 35 MB</span>
-      <span class="badge">X11 WORKSTATION</span>
-      <span class="badge">CUSTOM XPKG</span>
-    </div>
-  </div>
+<hr size="3" noshade>
 
-  <div class="panel-box">
-    <h2>I. System Philosophy &amp; Architecture</h2>
-    <p>
-      <b>FreeLinX</b> is an ultra-fast, independent operating system built from source without relying on the GNU toolchain, glibc, or systemd. It combines the speed of the <b>Linux 6.6 Kernel</b> with the lightweight precision of <b>Musl libc</b>, <b>LLVM / Clang</b>, <b>NetBSD userland</b>, and <b>Toybox</b>.
-    </p>
-    <p>
-      Key highlights of this release:
-    </p>
-    <ul>
-      <li><b>Zero GNU Dependencies:</b> Clang + LLVM libc++ / libunwind + Musl. No glibc, no gcc, no coreutils bloat.</li>
-      <li><b>Self-Hosting C Stack:</b> Built-in native <code>tcc</code> (Tiny C Compiler) and <code>clang</code>. Compile C code directly with zero setup.</li>
-      <li><b>Native Package Manager:</b> First-party <code>xpkg</code> binary packaging system with fast SQLite3 repository indexing.</li>
-      <li><b>Custom Filesystem Tools:</b> Dedicated <code>flx-fs</code> high-performance retro file system.</li>
-      <li><b>Instant Boot &amp; Low Footprint:</b> Cold boots in &lt; 2 seconds and idles at under 35 MB of RAM.</li>
-    </ul>
-  </div>
+<center>
+[ <a href="#about">Philosophy</a> | 
+  <a href="#keys">Keybindings</a> | 
+  <a href="#software">Software</a> | 
+  <a href="#search">Search</a> | 
+  <a href="#quickstart">Quickstart</a> | 
+  <a href="#install">Install to Disk</a> ]
+</center>
 
-  <div class="panel-box">
-    <h2>II. Essential Desktop Shortcuts (Q&yacute;sayollar)</h2>
-    <p>Control your FreeLinX desktop with lightning speed using these standard key combinations:</p>
-    <table class="retro-grid">
-      <tr>
-        <th width="32%">Key Combination</th>
-        <th width="28%">Action / Target</th>
-        <th width="40%">Description</th>
-      </tr>
-      <tr>
-        <td><span class="key-badge">Win</span> + <span class="key-badge">Enter</span> / <span class="key-badge">Win</span> + <span class="key-badge">t</span></td>
-        <td><b>Terminal Emulator</b></td>
-        <td>Launches <code>st</code> / <code>uxterm</code> with UTF-8 support</td>
-      </tr>
-      <tr>
-        <td><span class="key-badge">Win</span> + <span class="key-badge">e</span></td>
-        <td><b>flxt Text Editor</b></td>
-        <td>Opens the 90s Motif/CDE retro text editor with font scaling</td>
-      </tr>
-      <tr>
-        <td><span class="key-badge">Win</span> + <span class="key-badge">f</span></td>
-        <td><b>File Manager</b></td>
-        <td>Launches <code>flx-fm</code> Cairo graphical file manager</td>
-      </tr>
-      <tr>
-        <td><span class="key-badge">Win</span> + <span class="key-badge">w</span></td>
-        <td><b>Web Browser</b></td>
-        <td>Launches <b>Dillo 3.1.1</b> (or <code>flx-browser</code>)</td>
-      </tr>
-      <tr>
-        <td><span class="key-badge">Alt</span> + <span class="key-badge">Space</span> / <i>Right-Click</i></td>
-        <td><b>Root Menu</b></td>
-        <td>Opens full system menu anywhere on desktop</td>
-      </tr>
-      <tr>
-        <td><span class="key-badge">Alt</span> + <span class="key-badge">Tab</span></td>
-        <td><b>Switch Windows</b></td>
-        <td>Cycles through open application windows</td>
-      </tr>
-      <tr>
-        <td><span class="key-badge">Alt</span> + <span class="key-badge">F4</span></td>
-        <td><b>Close Window</b></td>
-        <td>Closes current active application window</td>
-      </tr>
-    </table>
-  </div>
+<hr size="1" noshade>
 
-  <div class="panel-box">
-    <h2>III. Built-in Applications &amp; Tools</h2>
-    <table class="retro-grid">
-      <tr>
-        <th width="25%">Category</th>
-        <th width="25%">Application</th>
-        <th width="50%">Features</th>
-      </tr>
-      <tr>
-        <td><b>Internet &amp; Web</b></td>
-        <td><code>dillo</code>, <code>links</code>, <code>lynx</code>, <code>w3m</code></td>
-        <td>Dillo FLTK 1.3 graphical browser with HTTPS, tabs, and image support</td>
-      </tr>
-      <tr>
-        <td><b>Text &amp; Code</b></td>
-        <td><code>flxt</code>, <code>vim</code>, <code>nvi</code></td>
-        <td>90s workstation editor with CDE colors, scalable bitmap fonts, and syntax highlighting</td>
-      </tr>
-      <tr>
-        <td><b>File Management</b></td>
-        <td><code>flx-fm</code></td>
-        <td>Double-click navigation, executable launching, and clean retro iconography</td>
-      </tr>
-      <tr>
-        <td><b>Development</b></td>
-        <td><code>clang</code>, <code>tcc</code>, <code>git</code>, <code>make</code>, <code>ninja</code>, <code>lua</code></td>
-        <td>Self-hosting non-GNU C toolchain ready for development</td>
-      </tr>
-      <tr>
-        <td><b>System Utilities</b></td>
-        <td><code>xpkg</code>, <code>flx-wifi</code>, <code>flx-net</code>, <code>htop</code></td>
-        <td>Package management, WiFi TUI configuration, and real-time process monitoring</td>
-      </tr>
-      <tr>
-        <td><b>Audio &amp; Games</b></td>
-        <td><code>mpg123</code>, <code>sndio</code>, <code>flx-doom</code></td>
-        <td>Low-latency audio playback and native Classic Doom engine port</td>
-      </tr>
-    </table>
-  </div>
+<a name="about"></a>
+<table border="1" cellpadding="6" cellspacing="0" width="100%" bgcolor="#dcdcdc">
+  <tr>
+    <th bgcolor="#000080" align="left">
+      <font color="#ffffff">&nbsp;1. SYSTEM PHILOSOPHY</font>
+    </th>
+  </tr>
+  <tr>
+    <td>
+      <p>
+      <b>FreeLinX</b> is a clean, modern operating system built on top of the
+      Linux kernel without any components from the GNU project. It uses no glibc,
+      no GCC, no GNU coreutils, and no systemd.
+      </p>
 
-  <div class="panel-box">
-    <h2>IV. Web Search (DuckDuckGo Lite)</h2>
-    <div class="search-box">
+      <ul>
+        <li><b>C Library:</b> Musl libc (strict standards, fast, lightweight).</li>
+        <li><b>Base Toolchain:</b> LLVM/Clang 21 with lld linker and compiler-rt.</li>
+        <li><b>Self-Hosting:</b> Native Tiny C Compiler (<code>tcc</code>) and Clang on-board.</li>
+        <li><b>Userland:</b> NetBSD base utilities, Toybox, and custom FreeLinX tools.</li>
+        <li><b>Package Manager:</b> <code>xpkg</code> (custom binary package format with SQLite3 repository index).</li>
+        <li><b>Filesystem:</b> <code>flx-fs</code> custom filesystem engine + ext4/vfat.</li>
+        <li><b>Init &amp; Services:</b> Lightweight runsv supervision + mdevd device hotplug.</li>
+        <li><b>Footprint:</b> Cold boot in ~1.5 seconds, base idle RAM consumption &lt; 35 MB.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<a name="keys"></a>
+<table border="1" cellpadding="6" cellspacing="0" width="100%" bgcolor="#dcdcdc">
+  <tr>
+    <th bgcolor="#000080" align="left">
+      <font color="#ffffff">&nbsp;2. DESKTOP SHORTCUTS (KEYBINDINGS)</font>
+    </th>
+  </tr>
+  <tr>
+    <td>
+      The desktop runs Openbox with a retro CDE/workstation color palette.
+      All primary functions can be driven directly from the keyboard:
+      <br><br>
+
+      <table border="1" cellpadding="4" cellspacing="1" width="100%" bgcolor="#ffffff">
+        <tr bgcolor="#004080">
+          <th width="30%"><font color="#ffffff">Key Combination</font></th>
+          <th width="30%"><font color="#ffffff">Action</font></th>
+          <th width="40%"><font color="#ffffff">Description</font></th>
+        </tr>
+        <tr>
+          <td><code>Win + Enter</code> or <code>Win + t</code></td>
+          <td><b>Terminal</b></td>
+          <td>Spawn st / uxterm interactive shell</td>
+        </tr>
+        <tr>
+          <td><code>Win + e</code></td>
+          <td><b>Text Editor</b></td>
+          <td>Launch <code>flxt</code> (90s Motif text editor)</td>
+        </tr>
+        <tr>
+          <td><code>Win + f</code></td>
+          <td><b>File Manager</b></td>
+          <td>Launch <code>flx-fm</code> graphical file browser</td>
+        </tr>
+        <tr>
+          <td><code>Win + w</code></td>
+          <td><b>Web Browser</b></td>
+          <td>Launch <code>dillo</code> graphical browser</td>
+        </tr>
+        <tr>
+          <td><code>Alt + Space</code></td>
+          <td><b>Root Menu</b></td>
+          <td>Open system menu at cursor position</td>
+        </tr>
+        <tr>
+          <td><code>Alt + Tab</code></td>
+          <td><b>Cycle Windows</b></td>
+          <td>Switch focus to next open window</td>
+        </tr>
+        <tr>
+          <td><code>Alt + F4</code></td>
+          <td><b>Close Window</b></td>
+          <td>Terminate or close the current window</td>
+        </tr>
+        <tr>
+          <td><i>Right-Click on desktop</i></td>
+          <td><b>Applications Menu</b></td>
+          <td>Full list of software, tools and shutdown options</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<a name="software"></a>
+<table border="1" cellpadding="6" cellspacing="0" width="100%" bgcolor="#dcdcdc">
+  <tr>
+    <th bgcolor="#000080" align="left">
+      <font color="#ffffff">&nbsp;3. INCLUDED APPLICATIONS</font>
+    </th>
+  </tr>
+  <tr>
+    <td>
+      <table border="1" cellpadding="4" cellspacing="1" width="100%" bgcolor="#ffffff">
+        <tr bgcolor="#004080">
+          <th width="20%"><font color="#ffffff">Domain</font></th>
+          <th width="30%"><font color="#ffffff">Command / Program</font></th>
+          <th width="50%"><font color="#ffffff">Purpose</font></th>
+        </tr>
+        <tr>
+          <td><b>Browsers</b></td>
+          <td><code>dillo</code>, <code>links</code>, <code>lynx</code>, <code>w3m</code></td>
+          <td>Graphical FLTK/X11 and text-mode web browsing</td>
+        </tr>
+        <tr>
+          <td><b>Editors</b></td>
+          <td><code>flxt</code>, <code>vim</code>, <code>nvi</code></td>
+          <td>CDE-styled Motif editor and classic vi editors</td>
+        </tr>
+        <tr>
+          <td><b>File Manager</b></td>
+          <td><code>flx-fm</code></td>
+          <td>Cairo-based dual navigation and launcher</td>
+        </tr>
+        <tr>
+          <td><b>Development</b></td>
+          <td><code>clang</code>, <code>tcc</code>, <code>git</code>, <code>make</code>, <code>ninja</code>, <code>lua</code></td>
+          <td>C compiler stack and build systems</td>
+        </tr>
+        <tr>
+          <td><b>Networking</b></td>
+          <td><code>flx-wifi</code>, <code>dhcpcd</code>, <code>ssh</code>, <code>curl</code></td>
+          <td>WiFi TUI, DHCP, OpenSSH client/daemon, and file fetcher</td>
+        </tr>
+        <tr>
+          <td><b>Diagnostics</b></td>
+          <td><code>htop</code>, <code>flx-net</code>, <code>smartctl</code></td>
+          <td>Process viewer, network status, drive health</td>
+        </tr>
+        <tr>
+          <td><b>Audio &amp; Games</b></td>
+          <td><code>mpg123</code>, <code>sndio</code>, <code>flx-doom</code></td>
+          <td>MPEG audio player, sound server, and Classic Doom</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<a name="search"></a>
+<table border="1" cellpadding="6" cellspacing="0" width="100%" bgcolor="#dcdcdc">
+  <tr>
+    <th bgcolor="#000080" align="left">
+      <font color="#ffffff">&nbsp;4. WEB SEARCH</font>
+    </th>
+  </tr>
+  <tr>
+    <td align="center" bgcolor="#ebebeb">
+      <br>
       <form action="https://duckduckgo.com/lite/" method="get">
-        <input type="text" name="q" class="search-input" placeholder="Search the web securely...">
-        <input type="submit" value="Search" class="search-btn">
+        <font size="+1"><b>DuckDuckGo Lite:</b></font>&nbsp;
+        <input type="text" name="q" size="42">
+        <input type="submit" value="Search">
       </form>
-    </div>
-    <p style="text-align: center; font-size: 11px; color: #555555;">
-      Fast, tracker-free web search optimized for lightweight graphical and text browsers.
-    </p>
-  </div>
+      <font size="-1"><i>Optimized for high-speed browsing on minimal graphical and terminal browsers.</i></font>
+      <br><br>
+    </td>
+  </tr>
+</table>
 
-  <div class="panel-box">
-    <h2>V. Quick Terminal Tips for Beginners</h2>
-    <p>Common administration and development commands in FreeLinX:</p>
-    <div class="code-block">
-# Install new packages from repository
-doas xpkg install &lt;package-name&gt;
+<br>
 
-# Search available packages
-xpkg search &lt;keyword&gt;
+<a name="quickstart"></a>
+<table border="1" cellpadding="6" cellspacing="0" width="100%" bgcolor="#dcdcdc">
+  <tr>
+    <th bgcolor="#000080" align="left">
+      <font color="#ffffff">&nbsp;5. COMMON TERMINAL COMMANDS</font>
+    </th>
+  </tr>
+  <tr>
+    <td>
+      Open a terminal (<code>Win+Enter</code>) and run:
+      <pre>
+  # Search and install packages via xpkg
+  xpkg search &lt;name&gt;
+  doas xpkg install &lt;package&gt;
 
-# Connect to WiFi network
-doas flx-wifi
+  # Scan and connect to wireless network
+  doas flx-wifi
 
-# Compile and run a C program on the fly with TCC
-cc program.c -o program &amp;&amp; ./program
+  # Compile a C file with Tiny C Compiler (instant)
+  cc hello.c -o hello &amp;&amp; ./hello
 
-# Install FreeLinX to bare metal disk (UEFI / GPT)
-doas flx-install
-    </div>
-  </div>
+  # Check active network routes and interfaces
+  flx-net
+  ifconfig
 
-  <hr class="retro-rule">
+  # Check running processes
+  htop
+      </pre>
+    </td>
+  </tr>
+</table>
 
-  <table width="100%" border="0">
-    <tr>
-      <td align="left" style="font-size: 11px; color: #404040;">
-        FreeLinX OS v1.0 &bull; 100% Non-GNU / Musl / LLVM / X11
-      </td>
-      <td align="right" style="font-size: 11px; color: #404040;">
-        Fast &bull; Independent &bull; Clean
-      </td>
-    </tr>
-  </table>
-</div>
+<br>
+
+<a name="install"></a>
+<table border="1" cellpadding="6" cellspacing="0" width="100%" bgcolor="#dcdcdc">
+  <tr>
+    <th bgcolor="#000080" align="left">
+      <font color="#ffffff">&nbsp;6. INSTALLATION TO DISK (BARE-METAL)</font>
+    </th>
+  </tr>
+  <tr>
+    <td>
+      <p>
+      FreeLinX includes an automated Bare-Metal GPT + Limine UEFI/BIOS installer.
+      To install this live system permanently onto an SSD, NVMe, or USB drive:
+      </p>
+      <pre>
+  doas flx-install
+      </pre>
+      <p>
+      The installer will detect available block storage devices, create GPT partitions,
+      format FAT32 EFI and Ext4 Root, deploy the entire system, and configure the
+      Limine bootloader automatically.
+      </p>
+    </td>
+  </tr>
+</table>
+
+<hr size="2" noshade>
+
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td align="left">
+      <font size="-1"><b>FreeLinX Project</b> &bull; Independent Non-GNU Computing</font>
+    </td>
+    <td align="right">
+      <font size="-1">Rendered with <b>Dillo 3.1.1</b></font>
+    </td>
+  </tr>
+</table>
 
 </body>
 </html>
