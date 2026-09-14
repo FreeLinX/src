@@ -1,6 +1,6 @@
 #!/bin/sh
 # FreeLinX Browser Launcher (non-GNU)
-# Launches Links in graphical mode (-g) if X11 is running, or text mode in console.
+# Launches Dillo in graphical mode if X11 is running, or Links in console mode.
 
 HOMEPAGE="/usr/share/freelinx/welcome.html"
 URL="${1:-$HOMEPAGE}"
@@ -8,7 +8,17 @@ URL="${1:-$HOMEPAGE}"
 [ -s /etc/resolv.conf ] || printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
 
 if [ -n "${DISPLAY:-}" ]; then
-    exec /usr/bin/links -g -ssl.certificates 0 "$URL"
-else
+    if [ -x /usr/bin/dillo ]; then
+        exec /usr/bin/dillo "$URL"
+    elif [ -x /usr/bin/links ]; then
+        exec /usr/bin/links -g -ssl.certificates 0 "$URL"
+    fi
+fi
+
+if [ -x /usr/bin/links ]; then
     exec /usr/bin/links -ssl.certificates 0 "$URL"
+elif [ -x /usr/bin/lynx ]; then
+    exec /usr/bin/lynx "$URL"
+elif [ -x /usr/bin/w3m ]; then
+    exec /usr/bin/w3m "$URL"
 fi
