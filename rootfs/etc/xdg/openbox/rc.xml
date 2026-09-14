@@ -315,7 +315,7 @@
     <action name="Execute"><command>flx-fm</command></action>
   </keybind>
   <keybind key="W-e">
-    <action name="Execute"><command>flx-pad</command></action>
+    <action name="Execute"><command>flxt</command></action>
   </keybind>
   <keybind key="W-i">
     <action name="Execute"><command>flx-view</command></action>

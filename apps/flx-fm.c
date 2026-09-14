@@ -348,8 +348,8 @@ static void open_item(int idx) {
         // Shell script: run in interactive uxterm
         snprintf(cmd, sizeof(cmd), "uxterm -T 'Script' -e sh -c \"'%s'; echo; printf 'Done. Press Enter...'; read l\" &", fullpath);
     } else {
-        // Text / code / config / unknown: open in flx-pad GUI editor
-        snprintf(cmd, sizeof(cmd), "flx-pad \"%s\" &", fullpath);
+        // Text / code / config / unknown: open in flxt GUI editor
+        snprintf(cmd, sizeof(cmd), "flxt \"%s\" &", fullpath);
     }
 
     system(cmd);

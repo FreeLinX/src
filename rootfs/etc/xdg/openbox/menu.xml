@@ -23,8 +23,8 @@
 </menu>
 
 <menu id="editors-menu" label="Editors">
-  <item label="Text Editor (flx-pad)">
-    <action name="Execute"><command>flx-pad</command></action>
+  <item label="Text Editor (flxt)">
+    <action name="Execute"><command>flxt</command></action>
   </item>
   <item label="Vim">
     <action name="Execute"><command>uxterm -e vim</command></action>
@@ -71,6 +71,9 @@
 </menu>
 
 <menu id="sound-menu" label="Sound">
+  <item label="MPEG Audio Player (mpg123)">
+    <action name="Execute"><command>uxterm -T "Audio Player" -e sh -c "mpg123 --help; echo; printf 'Usage: mpg123 &lt;file.mp3&gt;\nPress Enter to close...'; read l"</command></action>
+  </item>
   <item label="TinyALSA Mixer (tinymix)">
     <action name="Execute"><command>uxterm -e sh -c "/usr/bin/tinymix; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
@@ -97,6 +100,12 @@
 <menu id="system-app-menu" label="System">
   <item label="Install FreeLinX to Disk">
     <action name="Execute"><command>uxterm -e sh -c "doas /sbin/flx-install; echo; printf 'Press Enter to close...'; read l"</command></action>
+  </item>
+  <item label="Drive Health &amp; SMART (smartctl)">
+    <action name="Execute"><command>uxterm -T "Drive Health" -e sh -c "smartctl --scan; echo; printf 'Usage: smartctl -a /dev/sdX\nPress Enter to close...'; read l"</command></action>
+  </item>
+  <item label="UEFI Boot Manager (efibootmgr)">
+    <action name="Execute"><command>uxterm -T "UEFI Boot Entries" -e sh -c "efibootmgr; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Hardware Inventory (flx-driver scan)">
     <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver scan; echo; printf 'Press Enter to close...'; read l"</command></action>
