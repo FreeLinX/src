@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=mpv Media Player
+Comment=Universal audio and video player
+Exec=mpv %U
+Icon=multimedia-video-player
+Terminal=false
+Categories=AudioVideo;Audio;Video;Player;

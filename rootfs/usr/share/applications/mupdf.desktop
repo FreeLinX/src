@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MuPDF Document Viewer
+Comment=Lightweight PDF and EPUB viewer
+Exec=mupdf %u
+Icon=document-viewer
+Terminal=false
+Categories=Viewer;Graphics;Office;
