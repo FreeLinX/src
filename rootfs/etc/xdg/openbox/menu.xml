@@ -62,6 +62,9 @@
   <item label="Network Manager (CLI)">
     <action name="Execute"><command>uxterm -e flx-net</command></action>
   </item>
+  <item label="Dillo Web Browser">
+    <action name="Execute"><command>dillo</command></action>
+  </item>
   <item label="Links Web Browser">
     <action name="Execute"><command>flx-browser</command></action>
   </item>
@@ -186,7 +189,7 @@
     </action>
   </item>
 
-  <item label="Web Browser">
+  <item label="Web Browser (Dillo)">
     <action name="Execute">
       <command>flx-browser</command>
     </action>
