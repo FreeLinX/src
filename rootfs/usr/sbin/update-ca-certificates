@@ -1,0 +1,44 @@
+#!/bin/sh
+# FreeLinX CA Certificate Updater
+#
+# Fetches the latest trusted Mozilla root CA bundle and installs it
+# to /etc/ssl/certs/ca-certificates.crt for OpenSSL / LibreSSL / curl.
+#
+# Copyright (c) 2026 FreeLinX OS Project.
+# SPDX-License-Identifier: BSD-2-Clause
+
+set -e
+
+CERT_URL="https://curl.se/ca/cacert.pem"
+DEST_CERT="/etc/ssl/certs/ca-certificates.crt"
+TMP_CERT="/tmp/cacert.pem.$$"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Error: update-ca-certificates must be run as root." >&2
+    exit 1
+fi
+
+echo "Updating trusted CA certificates..."
+mkdir -p /etc/ssl/certs /etc/ssl
+
+if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$CERT_URL" -o "$TMP_CERT"
+elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$TMP_CERT" "$CERT_URL"
+else
+    echo "Error: Neither curl nor wget found." >&2
+    exit 1
+fi
+
+if [ ! -s "$TMP_CERT" ]; then
+    echo "Error: Downloaded CA bundle is empty." >&2
+    rm -f "$TMP_CERT"
+    exit 1
+fi
+
+mv -f "$TMP_CERT" "$DEST_CERT"
+chmod 644 "$DEST_CERT"
+ln -sf certs/ca-certificates.crt /etc/ssl/cert.pem 2>/dev/null || true
+
+COUNT=$(grep -c "BEGIN CERTIFICATE" "$DEST_CERT" || echo "0")
+echo "Successfully installed $COUNT trusted CA certificates to $DEST_CERT."
