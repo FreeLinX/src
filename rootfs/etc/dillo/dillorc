@@ -148,14 +148,10 @@
 #-------------------------------------------------------------------------
 
 # Set the start page.
-# start_page="about:blank"
-# start_page="https://dillo-browser.github.io/"
-# start_page="file:/home/jcid/custom_page.html"
-#start_page="about:splash"
+start_page="file:/usr/share/freelinx/welcome.html"
 
 # Set the home location
-# home="file:/home/jcid/HomePage/Home.html"
-#home="https://dillo-browser.github.io/"
+home="file:/usr/share/freelinx/welcome.html"
 
 # Set the URLs used by the web search dialog.
 # "%s" is replaced with the search keywords separated by '+'.
