@@ -14,41 +14,29 @@
 </menu>
 
 <menu id="files-menu" label="Files">
-  <item label="File Manager (flx-fm)">
-    <action name="Execute"><command>flx-fm</command></action>
-  </item>
   <item label="Browse /root (Terminal)">
     <action name="Execute"><command>uxterm -e sh -c "cd /root; ls -la; exec /bin/sh -l"</command></action>
   </item>
 </menu>
 
 <menu id="editors-menu" label="Editors">
-  <item label="Text Editor (flxt)">
-    <action name="Execute"><command>flxt</command></action>
-  </item>
   <item label="Vim">
     <action name="Execute"><command>uxterm -e vim</command></action>
   </item>
 </menu>
 
 <menu id="graphics-menu" label="Graphics">
-  <item label="Image Viewer (flx-view)">
-    <action name="Execute"><command>flx-view</command></action>
-  </item>
   <item label="PDF Viewer (MuPDF)">
     <action name="Execute"><command>uxterm -T "MuPDF" -e sh -c "echo 'MuPDF Document Viewer'; echo 'Usage: mupdf &lt;file.pdf&gt;'; echo; printf 'Press Enter to close...'; read l"</command></action>
-  </item>
-  <item label="Take Screenshot (flx-shot)">
-    <action name="Execute"><command>flx-shot</command></action>
   </item>
   <item label="3D OpenGL Gears (glxgears)">
     <action name="Execute"><command>glxgears</command></action>
   </item>
-  <item label="3D GPU Realtime Test (flx-3dtest)">
-    <action name="Execute"><command>uxterm -e flx-3dtest</command></action>
+  <item label="3D GPU Realtime Test (flx3dtest)">
+    <action name="Execute"><command>uxterm -e flx3dtest</command></action>
   </item>
   <item label="GPU 3D &amp; DRM Diagnostics">
-    <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver gpu; echo; printf 'Press Enter to close...'; read l"</command></action>
+    <action name="Execute"><command>uxterm -e sh -c "/sbin/flxdriver gpu; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
 </menu>
 
@@ -63,7 +51,7 @@
 
 <menu id="network-menu" label="Network">
   <item label="Network Manager (CLI)">
-    <action name="Execute"><command>uxterm -e flx-net</command></action>
+    <action name="Execute"><command>uxterm -e flxnet</command></action>
   </item>
   <item label="Dillo Web Browser">
     <action name="Execute"><command>dillo</command></action>
@@ -90,19 +78,19 @@
     <action name="Execute"><command>uxterm -e sh -c "/usr/bin/tinymix; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Audio Cards &amp; Endpoints">
-    <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver audio; echo; printf 'Press Enter to close...'; read l"</command></action>
+    <action name="Execute"><command>uxterm -e sh -c "/sbin/flxdriver audio; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
 </menu>
 
 <menu id="power-menu" label="Power &amp; Battery">
   <item label="Hardware &amp; Power Status">
-    <action name="Execute"><command>uxterm -e sh -c "/usr/bin/flx-power status; echo; printf 'Press Enter to close...'; read l"</command></action>
+    <action name="Execute"><command>uxterm -e sh -c "/usr/bin/flxpower status; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Set Governor: Performance">
-    <action name="Execute"><command>uxterm -e sh -c "doas /usr/bin/flx-power governor performance; echo; printf 'Press Enter to close...'; read l"</command></action>
+    <action name="Execute"><command>uxterm -e sh -c "doas /usr/bin/flxpower governor performance; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Set Governor: Powersave">
-    <action name="Execute"><command>uxterm -e sh -c "doas /usr/bin/flx-power governor powersave; echo; printf 'Press Enter to close...'; read l"</command></action>
+    <action name="Execute"><command>uxterm -e sh -c "doas /usr/bin/flxpower governor powersave; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Suspend to RAM (Sleep)">
     <action name="Execute"><command>zzz</command></action>
@@ -117,7 +105,7 @@
     <action name="Execute"><command>uxterm -T "Keyboard Layout" -e sh -c "setxkbmap us,az -option grp:alt_shift_toggle &amp;&amp; echo 'Keyboard layout set to US/AZ (toggle: Alt+Shift)'; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Install FreeLinX to Disk">
-    <action name="Execute"><command>uxterm -e sh -c "doas /sbin/flx-install; echo; printf 'Press Enter to close...'; read l"</command></action>
+    <action name="Execute"><command>uxterm -e sh -c "doas /sbin/flxinstall; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="Drive Health &amp; SMART (smartctl)">
     <action name="Execute"><command>uxterm -T "Drive Health" -e sh -c "smartctl --scan; echo; printf 'Usage: smartctl -a /dev/sdX\nPress Enter to close...'; read l"</command></action>
@@ -125,8 +113,8 @@
   <item label="UEFI Boot Manager (efibootmgr)">
     <action name="Execute"><command>uxterm -T "UEFI Boot Entries" -e sh -c "efibootmgr; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
-  <item label="Hardware Inventory (flx-driver scan)">
-    <action name="Execute"><command>uxterm -e sh -c "/sbin/flx-driver scan; echo; printf 'Press Enter to close...'; read l"</command></action>
+  <item label="Hardware Inventory (flxdriver scan)">
+    <action name="Execute"><command>uxterm -e sh -c "/sbin/flxdriver scan; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
   <item label="PCI Hardware (lspci)">
     <action name="Execute"><command>uxterm -e sh -c "lspci -nn; echo; printf 'Press Enter to close...'; read l"</command></action>
@@ -167,8 +155,8 @@
   <item label="Xmag (Magnifier)">
     <action name="Execute"><command>xmag</command></action>
   </item>
-  <item label="Custom Filesystem (flx-fs)">
-    <action name="Execute"><command>uxterm -e sh -c "flx-fs --help; echo; printf 'Press Enter to close...'; read l"</command></action>
+  <item label="Custom Filesystem (flxfs)">
+    <action name="Execute"><command>uxterm -e sh -c "flxfs --help; echo; printf 'Press Enter to close...'; read l"</command></action>
   </item>
 </menu>
 
@@ -195,12 +183,6 @@
   <item label="Terminal Emulator (urxvt)">
     <action name="Execute">
       <command>urxvt -e /bin/sh -l</command>
-    </action>
-  </item>
-
-  <item label="File Manager (flx-fm)">
-    <action name="Execute">
-      <command>flx-fm</command>
     </action>
   </item>
 
