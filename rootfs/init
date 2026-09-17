@@ -38,8 +38,35 @@ if [ -x /sbin/mdevd ]; then
         /sbin/mdevd-coldplug >/dev/null 2>&1 || :
     fi
 fi
-if [ -x /sbin/flx-driver ]; then
-    /sbin/flx-driver probe >/dev/null 2>&1 || :
+if [ -x /sbin/flxdriver ]; then
+    /sbin/flxdriver probe >/dev/null 2>&1 || :
+fi
+
+# --- Persistent /home (disk=/home boot model) --------------------------------
+# The ext4 partition labeled FLX_HOME carries the persistent /home.
+# It is normally mounted by /sbin/flxautomount via mdevd hotplug; the scan
+# below is a cold-boot fallback so /home is ready before services start.
+# The bundled mount(1) needs an explicit -t (no auto-detect), so the
+# partition type is resolved via blkid by label.
+if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
+    if ! grep -qs ' /home ' /proc/mounts; then
+        for pt in /sys/class/block/*; do
+            [ -d "$pt" ] || continue
+            case "$(basename "$pt")" in
+                *[0-9]) ;;
+                *) continue ;;
+            esac
+            BLKOUT="$(blkid "/dev/$(basename "$pt")" 2>/dev/null || true)"
+            FLX_LABEL=$(echo "$BLKOUT" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
+            FLX_TYPE=$(echo "$BLKOUT" | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
+            if [ "$FLX_LABEL" = "FLX_HOME" ] && [ -n "$FLX_TYPE" ]; then
+                mkdir -p /home
+                grep -qs " /home " /proc/mounts \
+                    || mount -t "$FLX_TYPE" -o "defaults,noatime" "/dev/$(basename "$pt")" /home 2>/dev/null
+                break
+            fi
+        done
+    fi
 fi
 
 # --- Input devices (evdev) ---------------------------------------------------
@@ -122,10 +149,10 @@ fi
 # XKB_DEFAULT_RULES/MODEL/LAYOUT are intentionally used by applications only.
 
 # --- Networking -------------------------------------------------------------
-/sbin/ifconfig lo 127.0.0.1 up 2>/dev/null || /sbin/flx-ifconfig lo up 2>/dev/null || :
-/sbin/flx-ifconfig eth0 inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
-/sbin/flx-ifconfig eth0 up 2>/dev/null || :
-/sbin/flx-route add default 10.0.2.2 2>/dev/null || /sbin/route add default gw 10.0.2.2 2>/dev/null || :
+/sbin/ifconfig lo 127.0.0.1 up 2>/dev/null || /sbin/flxifconfig lo up 2>/dev/null || :
+/sbin/flxifconfig eth0 inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
+/sbin/flxifconfig eth0 up 2>/dev/null || :
+/sbin/flxroute add default 10.0.2.2 2>/dev/null || /sbin/route add default gw 10.0.2.2 2>/dev/null || :
 printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
 /sbin/dhcpcd -q -b eth0 2>/dev/null || :
 
