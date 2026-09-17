@@ -1,0 +1,18 @@
+#!/bin/sh
+# flxbar-bottom: lemonbar bottom status bar fed by i3status.
+# lemonbar-xft: fontconfig fonts, docked at the bottom edge (-b).
+
+export FONTCONFIG_PATH=/etc/fonts
+export FONTCONFIG_FILE=/etc/fonts/fonts.conf
+
+FG="#d7d7d7"
+BG="#1e1e1e"
+BH=20
+WIDTH=$(xrandr --current 2>/dev/null | grep -E '\bconnected\b' | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d x -f1)
+HEIGHT=$(xrandr --current 2>/dev/null | grep -E '\bconnected\b' | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d x -f2)
+[ -z "$WIDTH" ] && WIDTH=1280
+[ -z "$HEIGHT" ] && HEIGHT=800
+Y=$((HEIGHT-BH))
+
+i3status -c /etc/i3status.conf |
+    lemonbar -b -p -g "${WIDTH}x${BH}+0+${Y}" -f "DejaVu Sans:size=9" -F "$FG" -B "$BG"
