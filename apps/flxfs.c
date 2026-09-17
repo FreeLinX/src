@@ -277,13 +277,13 @@ static int cmd_mkfs(int argc, char **argv) {
 static int cmd_info(const char *img_path) {
     int fd = open(img_path, O_RDONLY);
     if (fd < 0) {
-        perror("flx-fs: open");
+        perror("flxfs: open");
         return 1;
     }
 
     FlxSuperblock sb;
     if (!read_block(fd, 0, &sb) || memcmp(sb.magic, FLXFS_MAGIC, 8) != 0) {
-        fprintf(stderr, "flx-fs: '%s' is not a valid FreeLinX Filesystem volume\n", img_path);
+        fprintf(stderr, "flxfs: '%s' is not a valid FreeLinX Filesystem volume\n", img_path);
         close(fd);
         return 1;
     }
@@ -319,20 +319,20 @@ static int cmd_info(const char *img_path) {
 static int cmd_ls(const char *img_path) {
     int fd = open(img_path, O_RDONLY);
     if (fd < 0) {
-        perror("flx-fs: open");
+        perror("flxfs: open");
         return 1;
     }
 
     FlxSuperblock sb;
     if (!read_block(fd, 0, &sb) || memcmp(sb.magic, FLXFS_MAGIC, 8) != 0) {
-        fprintf(stderr, "flx-fs: '%s' is not a valid FreeLinX Filesystem volume\n", img_path);
+        fprintf(stderr, "flxfs: '%s' is not a valid FreeLinX Filesystem volume\n", img_path);
         close(fd);
         return 1;
     }
 
     FlxInode root_ino;
     if (!read_inode(fd, &sb, 1, &root_ino)) {
-        fprintf(stderr, "flx-fs: Failed to read root inode\n");
+        fprintf(stderr, "flxfs: Failed to read root inode\n");
         close(fd);
         return 1;
     }
@@ -364,7 +364,7 @@ static int cmd_ls(const char *img_path) {
 static int cmd_put(const char *img_path, const char *host_path, const char *flxfs_name) {
     int host_fd = open(host_path, O_RDONLY);
     if (host_fd < 0) {
-        perror("flx-fs: open host file");
+        perror("flxfs: open host file");
         return 1;
     }
 
@@ -374,7 +374,7 @@ static int cmd_put(const char *img_path, const char *host_path, const char *flxf
 
     int img_fd = open(img_path, O_RDWR);
     if (img_fd < 0) {
-        perror("flx-fs: open image");
+        perror("flxfs: open image");
         close(host_fd);
         return 1;
     }
@@ -382,7 +382,7 @@ static int cmd_put(const char *img_path, const char *host_path, const char *flxf
     FlxSuperblock sb;
     read_block(img_fd, 0, &sb);
     if (memcmp(sb.magic, FLXFS_MAGIC, 8) != 0) {
-        fprintf(stderr, "flx-fs: Invalid filesystem\n");
+        fprintf(stderr, "flxfs: Invalid filesystem\n");
         close(host_fd);
         close(img_fd);
         return 1;
@@ -393,7 +393,7 @@ static int cmd_put(const char *img_path, const char *host_path, const char *flxf
     read_block(img_fd, sb.inode_bitmap_start, ibm);
     int64_t free_ino_idx = bitmap_find_free(ibm, sb.total_inodes);
     if (free_ino_idx < 1) {
-        fprintf(stderr, "flx-fs: Out of inodes\n");
+        fprintf(stderr, "flxfs: Out of inodes\n");
         close(host_fd);
         close(img_fd);
         return 1;
@@ -409,7 +409,7 @@ static int cmd_put(const char *img_path, const char *host_path, const char *flxf
 
     uint64_t needed_blocks = (file_size + FLXFS_BLOCK_SIZE - 1) / FLXFS_BLOCK_SIZE;
     if (needed_blocks > FLXFS_DIRECT_BLOCKS) {
-        fprintf(stderr, "flx-fs: File exceeds direct block limit (max %u KB)\n",
+        fprintf(stderr, "flxfs: File exceeds direct block limit (max %u KB)\n",
                 FLXFS_DIRECT_BLOCKS * FLXFS_BLOCK_SIZE / 1024);
         close(host_fd);
         close(img_fd);
@@ -426,7 +426,7 @@ static int cmd_put(const char *img_path, const char *host_path, const char *flxf
     for (uint64_t b = 0; b < needed_blocks; b++) {
         int64_t free_blk = bitmap_find_free(bbm, sb.total_blocks - sb.data_blocks_start);
         if (free_blk < 0) {
-            fprintf(stderr, "flx-fs: Out of disk blocks\n");
+            fprintf(stderr, "flxfs: Out of disk blocks\n");
             close(host_fd);
             close(img_fd);
             return 1;
@@ -478,7 +478,7 @@ static int cmd_put(const char *img_path, const char *host_path, const char *flxf
                host_path, flxfs_name, new_ino_num, file_size, needed_blocks);
         return 0;
     } else {
-        fprintf(stderr, "flx-fs: Root directory full\n");
+        fprintf(stderr, "flxfs: Root directory full\n");
         return 1;
     }
 }
@@ -487,14 +487,14 @@ static int cmd_put(const char *img_path, const char *host_path, const char *flxf
 static int cmd_cat(const char *img_path, const char *target_name) {
     int fd = open(img_path, O_RDONLY);
     if (fd < 0) {
-        perror("flx-fs: open");
+        perror("flxfs: open");
         return 1;
     }
 
     FlxSuperblock sb;
     read_block(fd, 0, &sb);
     if (memcmp(sb.magic, FLXFS_MAGIC, 8) != 0) {
-        fprintf(stderr, "flx-fs: Invalid filesystem\n");
+        fprintf(stderr, "flxfs: Invalid filesystem\n");
         close(fd);
         return 1;
     }
@@ -515,7 +515,7 @@ static int cmd_cat(const char *img_path, const char *target_name) {
     }
 
     if (!found_ino) {
-        fprintf(stderr, "flx-fs: File '%s' not found\n", target_name);
+        fprintf(stderr, "flxfs: File '%s' not found\n", target_name);
         close(fd);
         return 1;
     }
@@ -540,13 +540,13 @@ static int cmd_cat(const char *img_path, const char *target_name) {
 static int cmd_check(const char *img_path) {
     int fd = open(img_path, O_RDONLY);
     if (fd < 0) {
-        perror("flx-fs: open");
+        perror("flxfs: open");
         return 1;
     }
 
     FlxSuperblock sb;
     if (!read_block(fd, 0, &sb) || memcmp(sb.magic, FLXFS_MAGIC, 8) != 0) {
-        fprintf(stderr, "flx-fs check: Bad magic header. Not a FLXFS volume.\n");
+        fprintf(stderr, "flxfs check: Bad magic header. Not a FLXFS volume.\n");
         close(fd);
         return 1;
     }
@@ -558,7 +558,7 @@ static int cmd_check(const char *img_path) {
 
     FlxInode root_ino;
     if (!read_inode(fd, &sb, 1, &root_ino) || (root_ino.mode & 0040000) == 0) {
-        fprintf(stderr, "flx-fs check: Corrupted root inode!\n");
+        fprintf(stderr, "flxfs check: Corrupted root inode!\n");
         close(fd);
         return 1;
     }
@@ -582,14 +582,14 @@ int main(int argc, char **argv) {
     }
 
     if (argc < 2 || strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-        printf("FreeLinX Custom Filesystem Management Utility (flx-fs)\n");
+        printf("FreeLinX Custom Filesystem Management Utility (flxfs)\n");
         printf("Usage:\n");
         printf("  mkfs.flxfs [-L label] [-s size] <image_or_device>\n");
-        printf("  flx-fs info <image>\n");
-        printf("  flx-fs ls <image>\n");
-        printf("  flx-fs put <image> <host_file> <flxfs_name>\n");
-        printf("  flx-fs cat <image> <flxfs_name>\n");
-        printf("  flx-fs check <image>\n");
+        printf("  flxfs info <image>\n");
+        printf("  flxfs ls <image>\n");
+        printf("  flxfs put <image> <host_file> <flxfs_name>\n");
+        printf("  flxfs cat <image> <flxfs_name>\n");
+        printf("  flxfs check <image>\n");
         return 0;
     }
 
@@ -607,6 +607,6 @@ int main(int argc, char **argv) {
         return cmd_mkfs(argc - 1, argv + 1);
     }
 
-    fprintf(stderr, "flx-fs: Unknown command '%s'. Run 'flx-fs --help' for usage.\n", argv[1]);
+    fprintf(stderr, "flxfs: Unknown command '%s'. Run 'flxfs --help' for usage.\n", argv[1]);
     return 1;
 }

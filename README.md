@@ -44,9 +44,9 @@ hardware:
 `rootfs/sbin/` holds the boot-relevant BSD-flavoured tools (all static musl,
 zero GNU):
 
-    flx-ifconfig      BSD-style ifconfig (netlink via libnl)
-    flx-route         BSD-style route  (netlink via libnl)
-    flx-wifi          wrapper: wpa_supplicant + wpa_cli + dhcpcd
+    flxifconfig      BSD-style ifconfig (netlink via libnl)
+    flxroute         BSD-style route  (netlink via libnl)
+    flxwifi          wrapper: wpa_supplicant + wpa_cli + dhcpcd
     wpa_supplicant    WPA/WPA2/WPA3 supplicant
     wpa_cli           supplicant control CLI
     wpa_passphrase    WPA PSK generator
@@ -54,15 +54,15 @@ zero GNU):
 
 Bring up wired (verified) or wireless (needs real hardware):
 
-    flx-ifconfig eth0 up
-    flx-ifconfig eth0 inet 10.0.2.15/24
-    flx-route add default 10.0.2.2
+    flxifconfig eth0 up
+    flxifconfig eth0 inet 10.0.2.15/24
+    flxroute add default 10.0.2.2
     ping 10.0.2.2
 
     # wireless (physical NIC + matching firmware):
     modprobe iwlwifi
-    flx-wifi scan
-    flx-wifi connect "MyNetwork" "password"
+    flxwifi scan
+    flxwifi connect "MyNetwork" "password"
     dhcpcd wlan0
 
 ### Interactive shell image
@@ -72,7 +72,7 @@ a root shell with all of the above present:
     qemu-system-x86_64 \
         -kernel <kernel>/linux-6.6.21/arch/x86/boot/bzImage \
         -initrd build/x86_64/initramfs-shell.cpio.gz \
-        -append "console=ttyS0 rdinit=/sbin/flx-shell-init quiet" \
+        -append "console=ttyS0 rdinit=/sbin/flxshell-init quiet" \
         -nographic -monitor none -m 512M
 
 You are dropped to a `#` prompt with `lo` up and the wifi driver modules

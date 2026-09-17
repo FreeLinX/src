@@ -338,12 +338,12 @@ static void open_item(int idx) {
         snprintf(status_text, sizeof(status_text), "Extracting %s ...", fi->name);
     } else if (ext && (strcmp(ext, ".html") == 0 || strcmp(ext, ".htm") == 0)) {
         // Web document
-        snprintf(cmd, sizeof(cmd), "flx-browser \"%s\" &", fullpath);
+        snprintf(cmd, sizeof(cmd), "flxbrowser \"%s\" &", fullpath);
     } else if (ext && (strcmp(ext, ".png") == 0 || strcmp(ext, ".ppm") == 0 ||
                        strcmp(ext, ".bmp") == 0 || strcmp(ext, ".jpg") == 0 ||
                        strcmp(ext, ".jpeg") == 0)) {
         // Image viewer
-        snprintf(cmd, sizeof(cmd), "flx-view \"%s\" &", fullpath);
+        snprintf(cmd, sizeof(cmd), "flxview \"%s\" &", fullpath);
     } else if (ext && strcmp(ext, ".sh") == 0) {
         // Shell script: run in interactive uxterm
         snprintf(cmd, sizeof(cmd), "uxterm -T 'Script' -e sh -c \"'%s'; echo; printf 'Done. Press Enter...'; read l\" &", fullpath);
@@ -949,7 +949,7 @@ int main(int argc, char **argv) {
 
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
-        fprintf(stderr, "flx-fm: Cannot open X display\n");
+        fprintf(stderr, "flxfm: Cannot open X display\n");
         return 1;
     }
 
@@ -972,7 +972,7 @@ int main(int argc, char **argv) {
     char win_title[1024];
     snprintf(win_title, sizeof(win_title), "FreeLinX Files - %s", current_path);
     XStoreName(dpy, win, win_title);
-    XClassHint ch = {"flx-fm", "FreeLinX"};
+    XClassHint ch = {"flxfm", "FreeLinX"};
     XSetClassHint(dpy, win, &ch);
 
     XSizeHints hints;

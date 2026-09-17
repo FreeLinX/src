@@ -30,11 +30,11 @@ typedef struct {
 
 static MenuItem menu_items[MAX_MENU_ITEMS] = {
     {"Terminal (uxterm)",     "uxterm &"},
-    {"File Manager (flx-fm)", "flx-fm &"},
-    {"Web Browser",           "flx-browser &"},
+    {"File Manager (flxfm)", "flxfm &"},
+    {"Web Browser",           "flxbrowser &"},
     {"Process Monitor (htop)","uxterm -T 'Process Monitor' -e htop &"},
     {"Text Editor (flxt)",   "flxt &"},
-    {"Image Viewer (flx-view)","flx-view &"},
+    {"Image Viewer (flxview)","flxview &"},
     {"3D Gears (glxgears)",   "glxgears &"},
     {"Screen Magnifier (xmag)","xmag &"},
     {"Classic Doom",          "doom &"},
@@ -422,7 +422,7 @@ int main(void) {
 
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
-        fprintf(stderr, "flx-panel: Cannot open X display\n");
+        fprintf(stderr, "flxpanel: Cannot open X display\n");
         return 1;
     }
 
@@ -457,8 +457,8 @@ int main(void) {
                                      depth, InputOutput, vis,
                                      CWBackPixel | CWEventMask | CWOverrideRedirect, &swa);
 
-    XStoreName(dpy, panel_win, "flx-panel");
-    XClassHint ch = {"flx-panel", "FreeLinX"};
+    XStoreName(dpy, panel_win, "flxpanel");
+    XClassHint ch = {"flxpanel", "FreeLinX"};
     XSetClassHint(dpy, panel_win, &ch);
 
     // Set Window Type to Dock
@@ -577,9 +577,9 @@ int main(void) {
                     if (mx >= 96 && mx < 96 + 28) {
                         system("uxterm &");
                     } else if (mx >= 96 + 32 && mx < 96 + 32 + 38) {
-                        system("flx-fm &");
+                        system("flxfm &");
                     } else if (mx >= 96 + 74 && mx < 96 + 74 + 34) {
-                        system("flx-browser &");
+                        system("flxbrowser &");
                     }
 
                     // 3. Check Task Tabs

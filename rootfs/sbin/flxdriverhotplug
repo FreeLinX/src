@@ -14,9 +14,9 @@ if [ -n "$MODALIAS" ]; then
     modprobe "$MODALIAS" 2>/dev/null || :
 fi
 
-# If flx-driver is installed, probe drivers for new hardware
-if [ -x /sbin/flx-driver ]; then
-    /sbin/flx-driver probe >/dev/null 2>&1 || :
+# If flxdriver is installed, probe drivers for new hardware
+if [ -x /sbin/flxdriver ]; then
+    /sbin/flxdriver probe >/dev/null 2>&1 || :
 fi
 
 exit 0

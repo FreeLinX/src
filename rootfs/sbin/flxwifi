@@ -1,13 +1,13 @@
 #!/bin/sh
-# flx-wifi - distro-style WiFi manager for FreeLinX.
+# flxwifi - distro-style WiFi manager for FreeLinX.
 # Wraps wpa_supplicant + wpa_cli + dhcpcd. Linux-only (nl80211).
 #
-#   flx-wifi scan                     : scan + list visible networks
-#   flx-wifi list                     : list known networks (config)
-#   flx-wifi connect "SSID" [pass]    : connect (open or WPA with password)
-#   flx-wifi disconnect               : drop the current connection
-#   flx-wifi status                   : show current connection
-#   flx-wifi off                      : stop the supplicant
+#   flxwifi scan                     : scan + list visible networks
+#   flxwifi list                     : list known networks (config)
+#   flxwifi connect "SSID" [pass]    : connect (open or WPA with password)
+#   flxwifi disconnect               : drop the current connection
+#   flxwifi status                   : show current connection
+#   flxwifi off                      : stop the supplicant
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 export PATH
@@ -16,25 +16,25 @@ IFACE="${FLX_WIFI_IFACE:-wlan0}"
 SUP=/sbin/wpa_supplicant
 CLI=/sbin/wpa_cli
 DHCP=/sbin/dhcpcd
-CONF=/var/run/flx-wifi.conf
+CONF=/var/run/flxwifi.conf
 CTRL=/var/run/wpa_supplicant
-NETWORKS=/etc/wpa_supplicant/flx-wifi.conf
+NETWORKS=/etc/wpa_supplicant/flxwifi.conf
 PSKTOOL=/sbin/wpa_passphrase
 
 log()
 {
-	printf '[flx-wifi] %s\n' "$*"
+	printf '[flxwifi] %s\n' "$*"
 }
 
 die()
 {
-	printf '[flx-wifi] error: %s\n' "$*" >&2
+	printf '[flxwifi] error: %s\n' "$*" >&2
 	exit 1
 }
 
 iface_up()
 {
-	flx-ifconfig "$IFACE" 2>/dev/null | grep -q 'UP' || flx-ifconfig "$IFACE" up 2>/dev/null || :
+	flxifconfig "$IFACE" 2>/dev/null | grep -q 'UP' || flxifconfig "$IFACE" up 2>/dev/null || :
 }
 
 ensure_sup()
@@ -74,7 +74,7 @@ cmd_connect()
 {
 	ssid=$1
 	pass=$2
-	[ -n "$ssid" ] || die "usage: flx-wifi connect \"SSID\" [password]"
+	[ -n "$ssid" ] || die "usage: flxwifi connect \"SSID\" [password]"
 	[ -d "/sys/class/net/$IFACE" ] || die "wireless interface '$IFACE' not found."
 
 	iface_up
@@ -132,5 +132,5 @@ case "${1:-}" in
 	disconnect) cmd_disconnect ;;
 	status)     cmd_status ;;
 	off)        cmd_off ;;
-	*) echo "usage: flx-wifi {scan|list|connect \"SSID\" [pass]|disconnect|status|off}"; exit 1 ;;
+	*) echo "usage: flxwifi {scan|list|connect \"SSID\" [pass]|disconnect|status|off}"; exit 1 ;;
 esac

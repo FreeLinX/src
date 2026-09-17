@@ -1,5 +1,5 @@
 #!/bin/sh
-# FreeLinX User Creation Utility (flx-adduser)
+# FreeLinX User Creation Utility (flxadduser)
 #
 # Adds desktop users with proper group memberships (wheel, video, audio, input, disk)
 # and seeds their retro desktop configuration.
@@ -10,7 +10,7 @@
 set -e
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Error: flx-adduser must be run as root." >&2
+    echo "Error: flxadduser must be run as root." >&2
     exit 1
 fi
 
