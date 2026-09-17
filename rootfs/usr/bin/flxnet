@@ -9,7 +9,7 @@ show_menu() {
     echo "================================================="
     echo ""
     echo " Interfaces:"
-    /sbin/flx-ifconfig 2>/dev/null | grep -E '^[a-z0-9]+|inet ' || ip addr 2>/dev/null || true
+    /sbin/flxifconfig 2>/dev/null | grep -E '^[a-z0-9]+|inet ' || ip addr 2>/dev/null || true
     echo ""
     echo " Default Gateway:"
     route -n 2>/dev/null | grep '^0.0.0.0' || echo "  (none)"
@@ -35,7 +35,7 @@ while true; do
         1)
             echo ""
             echo "Scanning WiFi networks..."
-            /sbin/flx-wifi scan || echo "WiFi scan failed (is wlan0 available?)"
+            /sbin/flxwifi scan || echo "WiFi scan failed (is wlan0 available?)"
             echo ""
             read -p "Press Enter to continue..." dummy
             ;;
@@ -46,14 +46,14 @@ while true; do
             printf "Enter Password (leave empty for open): "
             read -r pass
             echo "Connecting to $ssid..."
-            /sbin/flx-wifi connect "$ssid" "$pass"
+            /sbin/flxwifi connect "$ssid" "$pass"
             echo ""
             read -p "Press Enter to continue..." dummy
             ;;
         3)
             echo ""
             echo "Disconnecting WiFi..."
-            /sbin/flx-wifi disconnect
+            /sbin/flxwifi disconnect
             echo "Done."
             read -p "Press Enter to continue..." dummy
             ;;

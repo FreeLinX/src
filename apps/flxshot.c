@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
-        fprintf(stderr, "flx-shot: Cannot open X display\n");
+        fprintf(stderr, "flxshot: Cannot open X display\n");
         return 1;
     }
 
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
     XImage *ximg = XGetImage(dpy, root, 0, 0, sw, sh, AllPlanes, ZPixmap);
     if (!ximg) {
-        fprintf(stderr, "flx-shot: Failed to capture X11 root window\n");
+        fprintf(stderr, "flxshot: Failed to capture X11 root window\n");
         XCloseDisplay(dpy);
         return 1;
     }
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
 
     cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, sw, sh);
     if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
-        fprintf(stderr, "flx-shot: Failed to create Cairo surface\n");
+        fprintf(stderr, "flxshot: Failed to create Cairo surface\n");
         XDestroyImage(ximg);
         XCloseDisplay(dpy);
         return 1;
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
     XDestroyImage(ximg);
 
     if (status != CAIRO_STATUS_SUCCESS) {
-        fprintf(stderr, "flx-shot: Failed to save PNG to '%s': %s\n",
+        fprintf(stderr, "flxshot: Failed to save PNG to '%s': %s\n",
                 out_path, cairo_status_to_string(status));
         XCloseDisplay(dpy);
         return 1;

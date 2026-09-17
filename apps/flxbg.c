@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
             if (parse_hex_color(argv[1], &cr_r, &cr_g, &cr_b)) {
                 is_solid = 1;
             } else {
-                fprintf(stderr, "flx-bg: Unrecognized color or missing file '%s', using default solid color\n", argv[1]);
+                fprintf(stderr, "flxbg: Unrecognized color or missing file '%s', using default solid color\n", argv[1]);
                 is_solid = 1;
             }
         }
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
-        fprintf(stderr, "flx-bg: Cannot open X display\n");
+        fprintf(stderr, "flxbg: Cannot open X display\n");
         return 1;
     }
 

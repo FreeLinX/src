@@ -9,6 +9,6 @@
  Authentic 1990s Plan 9 Rio Desktop Environment
 
  * Right-click desktop for applications and workspace menu.
- * Run 'flx-install' as root to install FreeLinX to disk.
+ * Run 'flxinstall' as root to install FreeLinX to disk.
  * Source & Issue tracker: https://github.com/FreeLinX
 

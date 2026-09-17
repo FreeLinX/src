@@ -1,6 +1,8 @@
 #!/bin/sh
-# FreeLinX USB & Removable Storage Auto-Mounter
+# FreeLinX Storage Auto-Mounter
 # Invoked by mdevd / mdev upon block device addition or removal.
+# The partition labeled FLX_HOME is the persistent /home; everything else
+# is treated as removable media and mounted under /media.
 #
 # Copyright (c) 2026 FreeLinX OS Project.
 # SPDX-License-Identifier: BSD-2-Clause
@@ -36,8 +38,31 @@ case "$ACTION" in
 
         # Determine filesystem type
         FSTYPE=""
+        FS_LABEL=""
         if command -v blkid >/dev/null 2>&1; then
-            FSTYPE=$(blkid "$DEVNODE" 2>/dev/null | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
+            OUT="$(blkid "$DEVNODE" 2>/dev/null || true)"
+            FSTYPE=$(echo "$OUT" | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
+            FS_LABEL=$(echo "$OUT" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
+        fi
+
+        # Persistent /home: mount the FLX_HOME partition at /home (not /media)
+        if [ "$FS_LABEL" = "FLX_HOME" ]; then
+            mkdir -p /home
+            if ! grep -qs ' /home ' /proc/mounts; then
+                # The bundled mount requires an explicit -t (no auto-detect);
+                # fall back to guessing from blkid, then common filesystems.
+                FSTYPE_OPT=""
+                [ -n "$FSTYPE" ] && FSTYPE_OPT="-t $FSTYPE"
+                if mount $FSTYPE_OPT -o defaults,noatime "$DEVNODE" /home 2>/dev/null ||
+                   mount -o defaults,noatime "$DEVNODE" /home 2>/dev/null; then
+                    log_msg "Mounted $DEVNODE (FSTYPE=$FSTYPE, LABEL=FLX_HOME) -> /home"
+                else
+                    log_msg "Failed to mount FLX_HOME partition $DEVNODE at /home"
+                fi
+            else
+                log_msg "/home already mounted; skipping FLX_HOME device $DEVNODE"
+            fi
+            exit 0
         fi
 
         mkdir -p "$MNTPOINT"
@@ -49,7 +74,10 @@ case "$ACTION" in
             MOUNT_OPTS="$MOUNT_OPTS,umask=000"
         fi
 
-        if mount -o "$MOUNT_OPTS" "$DEVNODE" "$MNTPOINT" 2>/dev/null; then
+        FSTYPE_OPT=""
+        [ -n "$FSTYPE" ] && FSTYPE_OPT="-t $FSTYPE"
+
+        if mount $FSTYPE_OPT -o "$MOUNT_OPTS" "$DEVNODE" "$MNTPOINT" 2>/dev/null; then
             log_msg "Mounted $DEVNODE ($FSTYPE) -> $MNTPOINT"
         else
             rmdir "$MNTPOINT" 2>/dev/null || :

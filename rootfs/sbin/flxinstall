@@ -1,0 +1,316 @@
+#!/bin/sh
+# FreeLinX Bare-Metal OS Installer (flxinstall)
+#
+# Boot model: INITRAMFS-PRIMARY, DISK=/HOME.
+#   - The entire FreeLinX operating system (kernel + full rootfs initramfs)
+#     is deployed inside the ESP and booted directly by Limine.
+#   - The second disk partition (ext4, LABEL=FLX_HOME) is mounted as
+#     persistent /home by the running system (automount/fstab).
+#   - No root filesystem or /sbin/init is installed to the disk.
+#
+# Fully autonomous, non-GNU installer for FreeLinX.
+# Supports UEFI (GPT) and Legacy BIOS using Limine.
+#
+# Copyright (c) 2026 FreeLinX OS Project.
+# SPDX-License-Identifier: BSD-2-Clause
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+echo ""
+echo "${CYAN}${BOLD}==============================================================${NC}"
+echo "${CYAN}${BOLD}       FreeLinX Bare-Metal Operating System Installer         ${NC}"
+echo "${CYAN}${BOLD}   Boot Model: Initramfs-Primary | Persistent Disk=/home      ${NC}"
+echo "${CYAN}${BOLD}        No-GNU | Static Musl | Linux 6.6 | X11 Retro          ${NC}"
+echo "${CYAN}${BOLD}==============================================================${NC}"
+echo ""
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "${RED}Error: flxinstall must be run as root.${NC}" >&2
+    exit 1
+fi
+
+# Locate required utilities
+command -v flxpart >/dev/null 2>&1 || {
+    if [ -x /sbin/flxpart ]; then PATH="$PATH:/sbin";
+    elif [ -x /usr/bin/flxpart ]; then PATH="$PATH:/usr/bin";
+    else echo "${RED}Error: flxpart utility not found.${NC}" >&2; exit 1; fi
+}
+
+MKFS_FAT=""
+if command -v mkfs.fat >/dev/null 2>&1; then MKFS_FAT="mkfs.fat"
+elif command -v mkfs.vfat >/dev/null 2>&1; then MKFS_FAT="mkfs.vfat"
+elif [ -x /sbin/mkfs.fat ]; then MKFS_FAT="/sbin/mkfs.fat"
+fi
+
+MKFS_EXT4=""
+if command -v mkfs.ext4 >/dev/null 2>&1; then MKFS_EXT4="mkfs.ext4"
+elif command -v mke2fs >/dev/null 2>&1; then MKFS_EXT4="mke2fs -t ext4"
+elif [ -x /sbin/mke2fs ]; then MKFS_EXT4="/sbin/mke2fs -t ext4"
+fi
+
+LIMINE_DIR="/usr/share/limine"
+
+if [ -z "$MKFS_FAT" ] || [ -z "$MKFS_EXT4" ]; then
+    echo "${RED}Error: Filesystem creation tools (mkfs.fat, mkfs.ext4) not found.${NC}" >&2
+    exit 1
+fi
+
+TARGET_DISK="$1"
+
+if [ -z "$TARGET_DISK" ]; then
+    echo "${YELLOW}Available Block Storage Devices:${NC}"
+    echo "--------------------------------------------------------------"
+    i=1
+    DISKS=""
+    for blk in /sys/block/*; do
+        devname=$(basename "$blk")
+        case "$devname" in
+            loop*|ram*|dm-*|sr*|zram*) continue ;;
+        esac
+
+        devpath="/dev/$devname"
+        [ -b "$devpath" ] || continue
+
+        size_sectors=$(cat "$blk/size" 2>/dev/null || echo 0)
+        size_gb=$(awk "BEGIN {printf \"%.1f\", $size_sectors * 512 / 1073741824}")
+
+        model="Unknown"
+        if [ -r "$blk/device/model" ]; then
+            model=$(cat "$blk/device/model" | tr -d '\r\n' | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+        fi
+
+        echo "  ${BOLD}[$i]${NC} $devpath  (${size_gb} GB - $model)"
+        DISKS="$DISKS $devpath"
+        i=$((i + 1))
+    done
+    echo "--------------------------------------------------------------"
+
+    if [ -z "$DISKS" ]; then
+        echo "${RED}No installable block devices detected!${NC}"
+        exit 1
+    fi
+
+    printf "\nEnter target disk path (e.g. /dev/sda, /dev/vda) or number: "
+    read -r CHOICE
+
+    if [ -b "$CHOICE" ]; then
+        TARGET_DISK="$CHOICE"
+    else
+        idx=1
+        for d in $DISKS; do
+            if [ "$idx" = "$CHOICE" ]; then
+                TARGET_DISK="$d"
+                break
+            fi
+            idx=$((idx + 1))
+        done
+    fi
+fi
+
+if [ ! -b "$TARGET_DISK" ]; then
+    echo "${RED}Error: Selected target '$TARGET_DISK' is not a valid block device!${NC}" >&2
+    exit 1
+fi
+
+echo ""
+echo "${RED}${BOLD}!!!!!!!!!!!!!!!!!!!!!!!!!! WARNING !!!!!!!!!!!!!!!!!!!!!!!!!!!${NC}"
+echo "${RED}${BOLD}ALL DATA on $TARGET_DISK will be PERMANENTLY ERASED!${NC}"
+echo "${RED}${BOLD}Partition table, files, and operating systems will be replaced!${NC}"
+echo "${RED}${BOLD}!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!${NC}"
+printf "\nType ${BOLD}YES${NC} in capital letters to proceed: "
+read -r CONFIRM
+
+if [ "$CONFIRM" != "YES" ]; then
+    echo "Installation cancelled."
+    exit 0
+fi
+
+echo ""
+echo "${GREEN}>>> Step 1/6: Partitioning $TARGET_DISK with flxpart (GPT)...${NC}"
+
+# Unmount any existing partitions on this disk
+for part in "${TARGET_DISK}"* "${TARGET_DISK}p"*; do
+    if [ -b "$part" ]; then
+        umount "$part" 2>/dev/null || :
+    fi
+done
+
+# ESP (512MB FAT32) + BIOS Boot (1MB) + Linux Home partition (remainder).
+# The OS boots entirely from the initramfs on the ESP; the Home ext4
+# partition (LABEL=FLX_HOME) is attached as persistent /home at boot.
+flxpart --create-standard "$TARGET_DISK"
+command -v partprobe >/dev/null 2>&1 && partprobe "$TARGET_DISK" 2>/dev/null || :
+sleep 1
+
+# Determine partition names
+case "$TARGET_DISK" in
+    *[0-9])
+        PART1="${TARGET_DISK}p1"
+        PART2="${TARGET_DISK}p2"
+        PART3="${TARGET_DISK}p3"
+        ;;
+    *)
+        PART1="${TARGET_DISK}1"
+        PART2="${TARGET_DISK}2"
+        PART3="${TARGET_DISK}3"
+        ;;
+esac
+
+# Fallback wait for device nodes
+timeout=10
+while [ ! -b "$PART1" ] || [ ! -b "$PART3" ]; do
+    sleep 0.5
+    timeout=$((timeout - 1))
+    [ "$timeout" -le 0 ] && break
+done
+
+if [ ! -b "$PART1" ] || [ ! -b "$PART3" ]; then
+    echo "${RED}Error: Partition device nodes ($PART1, $PART3) not found after partitioning.${NC}" >&2
+    exit 1
+fi
+
+echo "${GREEN}>>> Step 2/6: Formatting Filesystems...${NC}"
+echo "Formatting ESP partition ($PART1) as FAT32..."
+$MKFS_FAT -F 32 -n "FLX_BOOT" "$PART1" >/dev/null
+
+echo "Formatting Home partition ($PART3) as Ext4 (LABEL=FLX_HOME)..."
+$MKFS_EXT4 -F -q -L "FLX_HOME" "$PART3"
+
+echo "${GREEN}>>> Step 3/6: Mounting ESP...${NC}"
+BOOT_DIR="/mnt/flx_boot"
+mkdir -p "$BOOT_DIR"
+mount -t vfat "$PART1" "$BOOT_DIR" || toybox mount -t vfat "$PART1" "$BOOT_DIR"
+mkdir -p "$BOOT_DIR/boot" "$BOOT_DIR/EFI/BOOT"
+
+echo "${GREEN}>>> Step 4/6: Deploying FreeLinX Operating System (kernel + initramfs)...${NC}"
+# Kernel source (live environment)
+KERNEL_SRC=""
+for k in /boot/bzImage /boot/vmlinuz /kernel/bzImage /initramfs/bzImage /vmlinuz; do
+    if [ -f "$k" ]; then
+        KERNEL_SRC="$k"
+        break
+    fi
+done
+
+if [ -n "$KERNEL_SRC" ]; then
+    echo "Installing kernel from $KERNEL_SRC..."
+    cp "$KERNEL_SRC" "$BOOT_DIR/boot/bzImage"
+else
+    echo "${RED}Error: FreeLinX kernel not found in live environment.${NC}" >&2
+    umount "$BOOT_DIR"
+    exit 1
+fi
+
+# Initramfs source: the actual initramfs image if provided, otherwise (in the
+# initramfs-primary model) re-pack the entire running rootfs - the OS *is* the
+# initramfs, so a fresh repack is a byte-perfect equivalent of the live system.
+INITRD_SRC=""
+for i in /boot/initramfs.img.gz /initramfs.img.gz /boot/freelinx-desktop.img.gz; do
+    if [ -f "$i" ]; then
+        INITRD_SRC="$i"
+        break
+    fi
+done
+
+if [ -n "$INITRD_SRC" ]; then
+    echo "Installing initramfs (full OS) from $INITRD_SRC..."
+    cp "$INITRD_SRC" "$BOOT_DIR/boot/initramfs.img.gz"
+else
+    echo "No initramfs image found - repacking live rootfs (initramfs-primary model)..."
+    if command -v cpio >/dev/null 2>&1 && command -v gzip >/dev/null 2>&1; then
+        (cd / && find . -xdev \
+            -not -path './proc/*' -not -path './sys/*' \
+            -not -path './dev/*'  -not -path './run/*' \
+            -not -path './tmp/*'  -not -path './mnt/*' \
+            -not -path './media/*' \
+            -print0 2>/dev/null | cpio --null -ov --format=newc 2>/dev/null \
+            | gzip -1 > "$BOOT_DIR/boot/initramfs.img.gz") || {
+            echo "${RED}Error: failed to repack initramfs.${NC}" >&2
+            umount "$BOOT_DIR"
+            exit 1
+        }
+        echo "Packed running FreeLinX rootfs into initramfs.img.gz"
+    else
+        echo "${RED}Error: no initramfs image and no cpio/gzip to repack one.${NC}" >&2
+        umount "$BOOT_DIR"
+        exit 1
+    fi
+fi
+
+echo "${GREEN}>>> Step 5/6: Configuring Bootloader (Limine UEFI + BIOS)...${NC}"
+if [ -d "$LIMINE_DIR" ]; then
+    if [ -f "$LIMINE_DIR/BOOTX64.EFI" ]; then
+        cp "$LIMINE_DIR/BOOTX64.EFI" "$BOOT_DIR/EFI/BOOT/BOOTX64.EFI"
+        cp "$LIMINE_DIR/BOOTX64.EFI" "$BOOT_DIR/BOOTX64.EFI"
+        echo "Installed Limine UEFI Bootloader (BOOTX64.EFI)"
+    else
+        echo "${YELLOW}Warning: $LIMINE_DIR/BOOTX64.EFI not found; UEFI boot may be unavailable.${NC}"
+    fi
+    if [ -f "$LIMINE_DIR/limine-bios.sys" ]; then
+        cp "$LIMINE_DIR/limine-bios.sys" "$BOOT_DIR/boot/limine-bios.sys"
+        cp "$LIMINE_DIR/limine-bios.sys" "$BOOT_DIR/limine-bios.sys"
+    fi
+else
+    echo "${YELLOW}Warning: Limine files not found in $LIMINE_DIR.${NC}"
+fi
+
+# Install Limine BIOS stage. On GPT, the second stage lives in the dedicated
+# BIOS Boot partition (partition index 2).
+if command -v limine >/dev/null 2>&1; then
+    echo "Deploying Limine BIOS stage to $TARGET_DISK (BIOS Boot partition $PART2)..."
+    limine bios-install "$TARGET_DISK" 2 || {
+        echo "${YELLOW}Warning: limine bios-install failed; UEFI boot will still work.${NC}"
+    }
+fi
+
+# Generate Limine configuration (Limine v12.x syntax: lowercase keys,
+# nested entries, boot(): device prefix, module_path for initramfs).
+cat > "$BOOT_DIR/limine.conf" << EOF
+timeout: 5
+serial: yes
+
+/FreeLinX (Initramfs Desktop)
+    protocol: linux
+    kernel_path: boot():/boot/bzImage
+    module_path: boot():/boot/initramfs.img.gz
+    cmdline: rdinit=/init console=tty0 console=ttyS0,115200 quiet loglevel=2
+
+/FreeLinX (Rescue Shell)
+    protocol: linux
+    kernel_path: boot():/boot/bzImage
+    module_path: boot():/boot/initramfs.img.gz
+    cmdline: rdinit=/init init=/bin/sh console=tty0 console=ttyS0,115200
+EOF
+
+# Copy config to standard Limine lookup locations
+cp "$BOOT_DIR/limine.conf" "$BOOT_DIR/boot/limine.conf"
+cp "$BOOT_DIR/limine.conf" "$BOOT_DIR/EFI/BOOT/limine.conf"
+echo "Wrote Limine configuration (timeout=5, kernel_path=boot():/boot/bzImage)."
+
+echo "${GREEN}>>> Step 6/6: Persistence Setup (disk=/home)...${NC}"
+# The running initramfs mounts the FLX_HOME partition as persistent /home
+# via /etc/fstab and /sbin/flxautomount (label-based). Nothing else is
+# required on disk; the OS image lives entirely inside the ESP.
+echo "Home partition ready ($PART3, LABEL=FLX_HOME -> /home at boot)."
+
+# Unmounting
+echo "Syncing data to disk..."
+sync
+umount "$BOOT_DIR"
+rmdir "$BOOT_DIR" 2>/dev/null || :
+
+echo ""
+echo "${GREEN}${BOLD}==============================================================${NC}"
+echo "${GREEN}${BOLD}        FreeLinX successfully installed to $TARGET_DISK!        ${NC}"
+echo "${GREEN}${BOLD}       Boot model: Initramfs-primary, persistent /home.         ${NC}"
+echo "${GREEN}${BOLD}==============================================================${NC}"
+echo "You can now reboot your system into FreeLinX."
+echo "Your files in /home are stored on $PART3 and persist across reboots."
+echo ""

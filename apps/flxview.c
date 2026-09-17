@@ -142,10 +142,10 @@ static void draw_viewer(cairo_t *cr, Display *dpy, Window win) {
     // Window Title
     char title[600];
     if (current_file[0]) {
-        snprintf(title, sizeof(title), "%s (%dx%d, %d%%) - flx-view",
+        snprintf(title, sizeof(title), "%s (%dx%d, %d%%) - flxview",
                  current_file, img_w, img_h, (int)(zoom_scale * 100));
     } else {
-        snprintf(title, sizeof(title), "FreeLinX Image Viewer - flx-view");
+        snprintf(title, sizeof(title), "FreeLinX Image Viewer - flxview");
     }
     XStoreName(dpy, win, title);
 
@@ -197,7 +197,7 @@ static void draw_viewer(cairo_t *cr, Display *dpy, Window win) {
         cairo_set_font_size(cr, 11.0);
         cairo_set_source_rgb(cr, 0.40, 0.48, 0.58);
         cairo_move_to(cr, win_w / 2 - 150, win_h / 2 + 16);
-        cairo_show_text(cr, "Click Open or pass image path to flx-view");
+        cairo_show_text(cr, "Click Open or pass image path to flxview");
     }
     cairo_restore(cr);
 
@@ -320,7 +320,7 @@ int main(int argc, char **argv) {
 
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
-        fprintf(stderr, "flx-view: Cannot open X display\n");
+        fprintf(stderr, "flxview: Cannot open X display\n");
         return 1;
     }
 
@@ -338,8 +338,8 @@ int main(int argc, char **argv) {
                                depth, InputOutput, vis,
                                CWBackPixel | CWEventMask, &swa);
 
-    XStoreName(dpy, win, "flx-view");
-    XClassHint ch = {"flx-view", "FreeLinX"};
+    XStoreName(dpy, win, "flxview");
+    XClassHint ch = {"flxview", "FreeLinX"};
     XSetClassHint(dpy, win, &ch);
 
     Atom wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
