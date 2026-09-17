@@ -309,19 +309,7 @@
     <action name="Execute"><command>urxvt -e /bin/sh -l</command></action>
   </keybind>
   <keybind key="W-w">
-    <action name="Execute"><command>flx-browser</command></action>
-  </keybind>
-  <keybind key="W-f">
-    <action name="Execute"><command>flx-fm</command></action>
-  </keybind>
-  <keybind key="W-e">
-    <action name="Execute"><command>flxt</command></action>
-  </keybind>
-  <keybind key="W-i">
-    <action name="Execute"><command>flx-view</command></action>
-  </keybind>
-  <keybind key="Print">
-    <action name="Execute"><command>flx-shot</command></action>
+    <action name="Execute"><command>flxbrowser</command></action>
   </keybind>
   <!-- Keybindings to open FreeLinX Root Menu -->
   <keybind key="W-space">

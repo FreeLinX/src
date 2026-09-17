@@ -1,9 +1,0 @@
-#!/bin/sh
-# FreeLinX Doom Launcher
-WAD="/usr/share/games/doom/doom1.wad"
-
-if [ -n "${DISPLAY:-}" ]; then
-    exec /bin/doom -iwad "$WAD" "$@"
-else
-    exec /usr/bin/uxterm -T "Doom" -e sh -c "/bin/doom -iwad '$WAD'; echo ''; read -p 'Press Enter to close...' dummy"
-fi

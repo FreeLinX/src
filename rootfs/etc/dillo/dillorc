@@ -148,10 +148,10 @@
 #-------------------------------------------------------------------------
 
 # Set the start page.
-start_page="file:/usr/share/freelinx/welcome.html"
+start_page="https://lite.duckduckgo.com/lite/"
 
 # Set the home location
-home="file:/usr/share/freelinx/welcome.html"
+home="https://lite.duckduckgo.com/lite/"
 
 # Set the URLs used by the web search dialog.
 # "%s" is replaced with the search keywords separated by '+'.
