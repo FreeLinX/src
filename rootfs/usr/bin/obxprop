@@ -4,4 +4,4 @@ echo "Display: $DISPLAY"
 echo "Resolution: 1024x768 @ 60 FPS (ShadowFB enabled)"
 echo "Driver: fbdev + libshadowfb (Accelerated)"
 echo ""
-read -p "Press Enter to exit..." dummy
+printf "Press Enter to exit..." && read -r dummy

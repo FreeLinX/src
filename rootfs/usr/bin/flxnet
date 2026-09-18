@@ -37,7 +37,7 @@ while true; do
             echo "Scanning WiFi networks..."
             /sbin/flxwifi scan || echo "WiFi scan failed (is wlan0 available?)"
             echo ""
-            read -p "Press Enter to continue..." dummy
+            printf "Press Enter to continue..." && read -r dummy
             ;;
         2)
             echo ""
@@ -48,14 +48,14 @@ while true; do
             echo "Connecting to $ssid..."
             /sbin/flxwifi connect "$ssid" "$pass"
             echo ""
-            read -p "Press Enter to continue..." dummy
+            printf "Press Enter to continue..." && read -r dummy
             ;;
         3)
             echo ""
             echo "Disconnecting WiFi..."
             /sbin/flxwifi disconnect
             echo "Done."
-            read -p "Press Enter to continue..." dummy
+            printf "Press Enter to continue..." && read -r dummy
             ;;
         4)
             echo ""
@@ -65,14 +65,14 @@ while true; do
             echo "Requesting DHCP lease on $iface..."
             /sbin/dhcpcd -q "$iface" || echo "dhcpcd failed"
             echo ""
-            read -p "Press Enter to continue..." dummy
+            printf "Press Enter to continue..." && read -r dummy
             ;;
         5)
             echo ""
             echo "Testing ping to 1.1.1.1..."
             ping -c 3 1.1.1.1 || echo "Ping failed!"
             echo ""
-            read -p "Press Enter to continue..." dummy
+            printf "Press Enter to continue..." && read -r dummy
             ;;
         6|q|exit)
             echo "Goodbye."
