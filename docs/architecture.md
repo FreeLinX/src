@@ -2,7 +2,7 @@
 
 ## The final system
 
-Linux 6.1 on x86_64, musl libc, clang/LLD toolchain, NetBSD-derived
+Linux 6.6.21 (LTS) on x86_64, musl libc, clang/LLD toolchain, NetBSD-derived
 userland, runit for service supervision. The userspace must not depend on
 glibc or GNU coreutils once it exists; GNU tools are only acceptable on the
 host during bootstrap.
@@ -20,20 +20,38 @@ host during bootstrap.
       v
     final FreeLinX system
 
-Today `/init` is a placeholder (`rootfs/init`): it mounts the pseudo
-filesystems and either execs `/sbin/runsvdir` (once it exists) or drops to a
-rescue shell. It is staged, never executed by the build.
+`rootfs/init` is the real init: it mounts the pseudo filesystems, cold-probes
+the FLX_HOME partition and input devices, brings up networking, and execs
+`/sbin/runsvdir`. It is staged by the build and executed by the kernel at
+boot.
 
 ## Build flow
 
     toolchain repo -> clang/ld.lld + musl sysroot
-    kernel repo    -> Linux 6.1 image
+    kernel repo    -> Linux 6.6.21 (LTS) image
     src (this)     -> rootfs layout, system config, orchestration
     ports repo     -> statically linked NetBSD-derived userland
     iso repo       -> bootable image from src's build/<arch>/ output
 
 `src` is the integration point: it collects everything into one staging
 rootfs and hands it, plus a manifest, to the ISO repo.
+
+### Package delivery (1.0)
+
+The ISO ships a headless base system: kernel, /init, runit services, the
+statically linked NetBSD-derived userland, and the `xpkg` package client.
+Everything beyond that — the X11/openbox desktop stack (xorg, openbox,
+urxvt, xkbcomp, fonts, links, x11-apps, dzen2, lemonbar, i3status,
+flxbar-bottom) — is installed after boot with:
+
+    xpkg update       # sync repo index from Hugging Face (FreeLinX/packages)
+    xpkg install openbox urxvt links fonts
+
+A `flexfiboot` package carries the bootloader post-install hooks. All
+package archives (.xpkg) are gzip'd ustar with a pkg-info manifest, and the
+repo index (index.json) pins name -> file + sha256. Packages are staged
+from the QEMU-tested rootfs template, so an installed desktop is
+byte-faithful to what was tested.
 
 ## How the build works
 
@@ -74,11 +92,12 @@ All of them can be overridden on the command line of any script.
 
 ## What is missing
 
-- Userland binaries (`ports` repo) and the toolchain `bin/`/sysroot output.
-- Kernel image handling (owned by `iso`).
-- runit service trees under `var/service` and the real init.
-- Dynamic loaders and static binaries under `bin/`, `sbin/`, `usr/bin`,
-  `usr/sbin`, `usr/lib`.
+- A live kernel image inside this repo (delivered by the `kernel` repo /
+  assembled by `iso`).
+- The optional desktop stack until installed via `xpkg install` (the ISO is
+  headless by design; see "Package delivery" above).
 
-Until those exist, `scripts/build.sh` completes with a manifest that says
-exactly what was available and what was skipped.
+Everything else — toolchain output, the statically linked userland, the
+runit service trees, the real `/init` — is present in the 1.0 staging
+rootfs. `scripts/build.sh` produces a manifest that records exactly what
+was available and what was skipped.
