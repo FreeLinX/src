@@ -53,6 +53,9 @@
   <item label="Network Manager (CLI)">
     <action name="Execute"><command>uxterm -e flxnet</command></action>
   </item>
+  <item label="NetSurf Modern Web Browser">
+    <action name="Execute"><command>netsurf</command></action>
+  </item>
   <item label="Dillo Web Browser">
     <action name="Execute"><command>dillo</command></action>
   </item>
@@ -183,6 +186,12 @@
   <item label="Terminal Emulator (urxvt)">
     <action name="Execute">
       <command>urxvt -e /bin/sh -l</command>
+    </action>
+  </item>
+
+  <item label="Modern Web Browser (NetSurf)">
+    <action name="Execute">
+      <command>netsurf</command>
     </action>
   </item>
 
