@@ -57,15 +57,10 @@ fi
 if [ -n "$FOUND_KBD" ]; then
     ln -sf "$FOUND_KBD" /dev/fl-kbd
 fi
-if [ -n "$FOUND_TABLET" ] && [ -n "$FOUND_MOUSE" ]; then
+if [ -n "$FOUND_TABLET" ]; then
     ln -sf "$FOUND_TABLET" /dev/fl-pointer
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
-elif [ -n "$FOUND_TABLET" ]; then
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer2
 elif [ -n "$FOUND_MOUSE" ]; then
     ln -sf "$FOUND_MOUSE" /dev/fl-pointer
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
 fi
 
 if [ ! -e /dev/fl-kbd ]; then
@@ -84,11 +79,8 @@ if [ ! -e /dev/fl-pointer ]; then
         fi
     done
 fi
-if [ ! -e /dev/fl-pointer2 ] && [ -e /dev/fl-pointer ]; then
-    ln -sf "$(readlink /dev/fl-pointer)" /dev/fl-pointer2
-fi
 if [ ! -e /dev/fb0 ]; then mknod /dev/fb0 c 29 0 2>/dev/null || true; fi
-echo "FreeLinX Input: kbd=$(readlink /dev/fl-kbd) pointer=$(readlink /dev/fl-pointer) pointer2=$(readlink /dev/fl-pointer2)" > /dev/ttyS0
+echo "FreeLinX Input: kbd=$(readlink /dev/fl-kbd) pointer=$(readlink /dev/fl-pointer)" > /dev/ttyS0
 
 Xorg -config /etc/X11/xorg.conf -noreset -nolisten tcp -logfile /tmp/xorg.log > /dev/ttyS0 2>&1 &
 XPID=$!

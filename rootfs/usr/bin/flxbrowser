@@ -10,7 +10,9 @@ URL="${1:-$HOMEPAGE}"
 [ -s /etc/resolv.conf ] || printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
 
 if [ -n "${DISPLAY:-}" ]; then
-    if [ -x /usr/bin/dillo ]; then
+    if [ -x /usr/bin/netsurf ]; then
+        exec /usr/bin/netsurf "$URL"
+    elif [ -x /usr/bin/dillo ]; then
         exec /usr/bin/dillo "$URL"
     elif [ -x /usr/bin/links ]; then
         exec /usr/bin/links -g -ssl.certificates 0 "$URL"
