@@ -2,7 +2,9 @@
 # FreeLinX Browser Launcher (non-GNU)
 # Launches Dillo in graphical mode if X11 is running, or Links in console mode.
 
-HOMEPAGE="/usr/share/freelinx/welcome.html"
+# No local welcome page ships with the release rootfs (removed by design);
+# default to a lightweight search page when no URL is given.
+HOMEPAGE="https://duckduckgo.com/lite/"
 URL="${1:-$HOMEPAGE}"
 
 [ -s /etc/resolv.conf ] || printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
