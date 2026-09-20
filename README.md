@@ -28,10 +28,13 @@ host, loads a config file, and reports what it can and cannot do.
 `lib/` in the rootfs now carries the kernel build output needed for real
 hardware:
 
-- `lib/modules/6.6.21/` — the stripped WiFi driver modules (plus `depmod`
-  metadata): `iwlwifi`, `ath9k`/`ath9k_htc`, `ath10k_pci`, `brcmfmac`
-  (+ `brcmfmac-cyw`/`-wcc`/`-bca`), `brcmsmac`, plus deps (`ath`, `bcma`,
-  `cordic`, `brcmutil`). Built in the `kernel` repo, installed with
+- `lib/modules/6.6.21/` — the stripped kernel driver modules (plus
+  `depmod` metadata): Intel `iwlwifi`; Atheros `ath9k`/`ath9k_htc`,
+  `ath10k_pci`; Broadcom `brcmfmac` (+ `-cyw`/`-wcc`/`-bca`), `brcmsmac`;
+  Realtek `rtw88` (8821c/8822b/8822c PCIe/USB) and `rtw89` (8852a/8852b
+  PCIe); plus deps (`ath`, `bcma`, `cordic`, `brcmutil`) and the
+  nf/iptables + `x86_pkg_temp_thermal`/`efivarfs` helpers. Built in the
+  `kernel` repo, installed with
   `INSTALL_MOD_STRIP=1 modules_install INSTALL_MOD_PATH=src/rootfs`.
 - `lib/firmware/` — redistributable device blobs (from
   `ports/firmware/linux-firmware`) for those chips. **Not committed** (1.2G);
