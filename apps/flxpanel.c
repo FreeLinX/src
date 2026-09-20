@@ -30,11 +30,9 @@ typedef struct {
 
 static MenuItem menu_items[MAX_MENU_ITEMS] = {
     {"Terminal (uxterm)",     "uxterm &"},
-    {"File Manager (flxfm)", "flxfm &"},
     {"Web Browser",           "flxbrowser &"},
     {"Process Monitor (htop)","uxterm -T 'Process Monitor' -e htop &"},
-    {"Text Editor (flxt)",   "flxt &"},
-    {"Image Viewer (flxview)","flxview &"},
+    {"Text Editor (vi)",      "uxterm -e vi &"},
     {"3D Gears (glxgears)",   "glxgears &"},
     {"Screen Magnifier (xmag)","xmag &"},
     {"Classic Doom",          "doom &"},
@@ -577,7 +575,7 @@ int main(void) {
                     if (mx >= 96 && mx < 96 + 28) {
                         system("uxterm &");
                     } else if (mx >= 96 + 32 && mx < 96 + 32 + 38) {
-                        system("flxfm &");
+                        system("uxterm -T 'Process Monitor' -e htop &");
                     } else if (mx >= 96 + 74 && mx < 96 + 74 + 34) {
                         system("flxbrowser &");
                     }
