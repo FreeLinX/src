@@ -150,10 +150,18 @@ fi
 
 # --- Networking -------------------------------------------------------------
 /sbin/ifconfig lo 127.0.0.1 up 2>/dev/null || /sbin/flxifconfig lo up 2>/dev/null || :
-/sbin/flxifconfig eth0 inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
-/sbin/flxifconfig eth0 up 2>/dev/null || :
-/sbin/flxroute add default 10.0.2.2 2>/dev/null || /sbin/route add default gw 10.0.2.2 2>/dev/null || :
-printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+#
+# The static 10.0.2.x layout below is the QEMU user-net topology (guest
+# 10.0.2.15/24, gateway 10.0.2.2, DNS 10.0.2.3). It is only applied under
+# QEMU (SMBIOS sys_vendor == QEMU); on real hardware the interface is left
+# to dhcpcd, since hard-coding the QEMU addresses on a physical NIC would
+# misconfigure the network.
+if [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi qemu /sys/class/dmi/id/sys_vendor; then
+    /sbin/flxifconfig eth0 inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
+    /sbin/flxifconfig eth0 up 2>/dev/null || :
+    /sbin/flxroute add default 10.0.2.2 2>/dev/null || /sbin/route add default gw 10.0.2.2 2>/dev/null || :
+    printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+fi
 /sbin/dhcpcd -q -b eth0 2>/dev/null || :
 
 # --- hostname ---------------------------------------------------------------
