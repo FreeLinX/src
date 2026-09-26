@@ -83,6 +83,44 @@ if [ -f "$FREELINX_STAGE_ROOTFS/init" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 2b. Restore the modes git cannot carry.
+#
+# Git tracks exactly one mode bit - the executable one - so every file in the
+# template arrives as 0644 (or 0755 for anything with a shebang). That is
+# correct for ordinary data and wrong for a handful of files whose whole
+# purpose is to be private. /etc/shadow readable by every user on the system
+# is a standing credential-disclosure hole: it holds a hash per account, and
+# hashes are exactly the thing the mode is there to keep off other accounts.
+#
+# So the modes those files need are applied here, where the staged tree is
+# built, rather than in the template, where there is nowhere to put them. A
+# file listed here and missing from the template is reported rather than
+# skipped, because a private file that silently did not get created is the
+# outcome this step exists to prevent.
+#
+# format: <mode> <path relative to the staged root>
+#
+# Read a line at a time rather than word-splitting the whole table: the paths
+# are single tokens only by accident, and a path with a space in it would
+# silently become a mode.
+while read -r _mode _rel _rest; do
+    case $_mode in ''|'#'*) continue ;; esac
+    if [ -n "${_rest:-}" ]; then
+        freelinx_die "malformed entry in the sensitive-file table: '$_mode $_rel $_rest'"
+    fi
+    if [ -e "$FREELINX_STAGE_ROOTFS/$_rel" ]; then
+        chmod "$_mode" "$FREELINX_STAGE_ROOTFS/$_rel"
+    else
+        freelinx_warn "sensitive file absent from template: $_rel (wanted mode $_mode)"
+    fi
+done <<EOF
+0600 etc/shadow
+0600 etc/gshadow
+0600 etc/sudoers
+0640 etc/doas.conf
+EOF
+
+# ---------------------------------------------------------------------------
 # 3. Verify the staging tree.
 # ---------------------------------------------------------------------------
 for _d in $_dirs; do
