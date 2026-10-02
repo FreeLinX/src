@@ -29,6 +29,21 @@ mount -t devtmpfs devtmpfs /dev   2>/dev/null || :
 mkdir -p /dev/pts /run/user /dev/shm
 mount -t devpts -o gid=5,mode=0620,ptmxmode=0666 devpts /dev/pts 2>/dev/null || :
 rm -f /dev/ptmx && ln -s /dev/pts/ptmx /dev/ptmx
+
+# devtmpfs makes device nodes and nothing else, so /dev/fd and the three names
+# under it are missing.  Several programs in this tree open /dev/stdin rather
+# than file descriptor 0 - this system's sort does, and fails with
+#
+#   sort: /dev/stdin: No such file or directory
+#
+# on every pipeline it is given, which is not a sort problem to work around at
+# each call site but a name that ought to be there.  /dev/fd is the Linux
+# convention for it: a directory whose entries are /proc/self/fd/N.
+[ -e /dev/fd ] || ln -s /proc/self/fd /dev/fd
+for _fd in stdin stdout stderr; do
+	[ -e "/dev/$_fd" ] || ln -s "/proc/self/fd/$_fd" "/dev/$_fd"
+done
+unset _fd
 mount -t tmpfs    tmpfs    /run   2>/dev/null || :
 
 # --- Device Manager (mdevd) & Driver Auto-Probe ------------------------------
