@@ -1,0 +1,142 @@
+# FreeLinX /etc/services - service name to port and transport.
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# This file is not optional.  A program that calls getservbyname("ntp") or
+# getservbyport() gets ENOENT without it, and FreeLinX's own time daemon is
+# such a program:
+#
+#     src/ntpd.c ... ntp.c:108:   if ((se = getservbyname("ntp", "udp")) == NULL)
+#     src/ntpd.c ... ntp.c:109:           fatal("getservbyname");
+#
+# so with no /etc/services the ntpd service died on start with
+#
+#     ntp: getservbyname: No such file or directory
+#     Terminating
+#
+# and runsvdir restarted it, about once a second, forever.
+#
+# musl does not carry a built-in copy of this table: unlike glibc, its resolver
+# reads the file and nothing else.  That is the right design for a system whose
+# services are its own, and it means the file has to exist.
+#
+# This is the subset of the IANA registry that FreeLinX itself and the software
+# on the medium refer to by name.  It is not the full registry, and it is not
+# meant to be: a system that talks to something whose port is not listed here
+# can still use the number.  Add a line when a program you install needs one
+# that is missing, keeping the three columns aligned.
+#
+# The authoritative list is at https://www.iana.org/assignments/service-names-port-numbers/
+
+tcpmux		1/tcp				# TCP port service multiplexer
+echo		7/tcp
+echo		7/udp
+discard		9/tcp		sink null
+discard		9/udp		sink null
+systat		11/tcp		users
+daytime		13/tcp
+daytime		13/udp
+netstat		15/tcp
+qotd		17/tcp		quote
+chargen		19/tcp		ttytst source
+chargen		19/udp		ttytst source
+ftp-data	20/tcp
+ftp		21/tcp
+ssh		22/tcp				# SSH Remote Login Protocol
+telnet		23/tcp
+smtp		25/tcp		mail
+time		37/tcp		timserver
+time		37/udp		timserver
+whois		43/tcp		nicname
+tacacs		49/tcp				# Login Host Protocol (tacacs)
+tacacs		49/udp
+re-mail-ck	50/tcp				# Remote Mail Checking Protocol
+re-mail-ck	50/udp
+domain		53/tcp				# Domain Name Server
+domain		53/udp
+mtp		57/tcp				# deprecated
+bootps		67/udp				# BOOTP server
+bootpc		68/udp				# BOOTP client
+tftp		69/udp
+gopher		70/tcp				# Internet Gopher
+rje		71/tcp				# NetBSD Remote Job Entry
+finger		79/tcp
+http		80/tcp		www		# WorldWideWeb HTTP
+link		87/tcp		ttylink
+kerberos	88/tcp		kerberos5 krb5 kerberos-sec	# Kerberos v5
+kerberos	88/udp		kerberos5 krb5 kerberos-sec
+passwd		113/tcp		auth tap ident
+sftp		115/tcp
+uucp-path	117/tcp
+nntp		119/tcp		readnews untp news	# USENET News Transfer Protocol
+ntp		123/tcp					# Network Time Protocol
+ntp		123/udp					# Network Time Protocol
+pwdgen		129/tcp				# PWDGEN service
+loc-srv		135/tcp		epmap		# Location Service
+netbios-ns	137/tcp				# NETBIOS Name Service
+netbios-ns	137/udp
+netbios-dgm	138/tcp				# NETBIOS Datagram Service
+netbios-dgm	138/udp
+netbios-ssn	139/tcp				# NETBIOS session service
+netbios-ssn	139/udp
+imap2		143/tcp		imap		# Interim Mail Access P 2 and 4
+snmp		161/udp				# Simple Net Management Protocol
+snmp-trap	162/udp	snmptrap	# Traps for SNMP
+cmip-man	163/udp				# ISO mgmt over IP (CMOT)
+cmip-agent	164/udp
+mailq		174/tcp				# Mailer transport queue for Zmailer
+xdmcp		177/udp				# X Display Manager Control Protocol
+nextstep	178/tcp		NeXTStep NextStep
+nextstep	178/udp		NeXTStep NextStep
+bgp		179/tcp					# Border Gateway Protocol
+bgp		179/udp
+prospero	191/tcp				# Cliff Neuman's Prospero
+irc		194/tcp				# Internet Relay Chat
+ircs		194/udp				# Internet Relay Chat over TLS
+smux		199/tcp				# SNMP Unix Multiplexer
+at-rtmp		201/tcp				# AppleTalk routing
+at-nbp		202/tcp				# AppleTalk name binding
+at-echo		204/tcp				# AppleTalk echo
+at-zis		206/tcp				# AppleTalk zone information
+qmtp		209/tcp				# Quick Mail Transfer Protocol
+z39.50		210/tcp		z3950		# Z39.50 database
+z39.50		210/udp		z3950
+ipx		213/udp				# IPX
+imap3		220/tcp				# Interactive Mail Access
+pawserv		345/tcp				# Perf Analysis Workbench
+zserv		346/tcp				# Zebra server
+fatserv		347/tcp				# FAT
+rpc2portmap	111/tcp				# SUN RPC port mapper version 2
+rpc2portmap	111/udp				# SUN RPC port mapper version 2
+codaauth2	370/tcp				# Coda authentication server
+clearcase	371/tcp		CLEARCASE	# IBM ClearCase
+ulistserv	372/tcp				# UNIX Listserv
+ldap		389/tcp				# Lightweight Directory Access Protocol
+ldap		389/udp
+imsp		406/tcp				# Interactive Mail Support Protocol
+https		443/tcp				# http protocol over TLS/SSL
+https		443/udp				# HTTP/3
+snpp		444/tcp				# Simple Network Paging Protocol
+microsoft-ds	445/tcp				# Microsoft Naked CIFS
+kpasswd		464/tcp				# Kerberos passwd server
+submissions	465/tcp		ssmtp smtps urd	# Submission over TLS [RFC8314]
+saft		487/tcp				# Simple Asynchronous File Transfer
+isakmp		500/tcp				# IPsec - Internet Security Association
+isakmp		500/udp				# IPsec - Internet Security Association
+rtsp		554/tcp				# Real Time Stream Control Protocol
+rtsps		322/tcp				# RTSP over TLS
+nqs		607/tcp				# Network Queuing system
+npmp-local	610/tcp		dqs313_qmaster	# npmp-local / DQS
+npmp-gui	611/tcp		dqs313_execd	# npmp-gui / DQS
+npmp-gui	611/udp		dqs313_execd	# npmp-gui / DQS
+hmmp-ind	612/tcp		dqs313_intercell# HMMP Indication / DQS
+asf-rmcp	623/udp				# ASF Remote Management and Control Protocol
+ipp		631/tcp				# Internet Printing Protocol
+ldaps		636/tcp				# LDAP over SSL
+acap		674/tcp				# Application Configuration Access Protocol
+ftps-data	989/tcp				# FTP over SSL data
+ftps		990/tcp
+nas		991/tcp				# Netnews Administration System
+telnets		992/tcp				# Telnet over SSL
+imaps		993/tcp				# IMAP over SSL
+pop3s		995/tcp				# POP-3 over SSL

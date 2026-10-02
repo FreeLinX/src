@@ -63,24 +63,96 @@ fi
 # below is a cold-boot fallback so /home is ready before services start.
 # The bundled mount(1) needs an explicit -t (no auto-detect), so the
 # partition type is resolved via blkid by label.
-if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
-    if ! grep -qs ' /home ' /proc/mounts; then
-        for pt in /sys/class/block/*; do
-            [ -d "$pt" ] || continue
-            case "$(basename "$pt")" in
-                *[0-9]) ;;
-                *) continue ;;
-            esac
-            BLKOUT="$(blkid "/dev/$(basename "$pt")" 2>/dev/null || true)"
-            FLX_LABEL=$(echo "$BLKOUT" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
-            FLX_TYPE=$(echo "$BLKOUT" | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
-            if [ "$FLX_LABEL" = "FLX_HOME" ] && [ -n "$FLX_TYPE" ]; then
-                mkdir -p /home
-                grep -qs " /home " /proc/mounts \
-                    || mount -t "$FLX_TYPE" -o "defaults,noatime" "/dev/$(basename "$pt")" /home 2>/dev/null
+#
+# The medium this system booted from is found the same way, by its volume id
+# FREELINX_MEDIUM, and mounted read-only at /media/flx.  /usr/sbin/xsetup reads
+# the installer from there, so without this the installer is on the disc and
+# not reachable from the system booted off that disc.
+#
+# FREELINX_VAR is the third label, and it is what "data mode" is for.  That mode
+# runs the system from RAM and keeps one filesystem on a disk for /var, so that
+# state survives a reboot.  /var is where the things that must survive go:
+# /var/lib/xpkg is the package database, /var/lib/lbu the local overlay,
+# /var/log the logs, /var/cache the package cache.  In RAM-only mode all of that
+# is thrown away on reboot, which is what makes a second disk worth creating.
+#
+# It is mounted before /home because a package database that is being read while
+# the filesystem underneath it is still being written is not a thing to arrange
+# on purpose.  noatime because the times of /var/lib are not interesting, and
+# the writes they cost on every read are.
+#
+# Each scan waits for the device node.  /sys/class/block lists a partition
+# before devtmpfs has made /dev/vdaN for it, and the bundled mount(8) says so
+# plainly:
+#
+#   mount: /dev/vda3: No such file or directory
+#
+# which is indistinguishable from a partition that does not exist, so a scan
+# that does not wait silently gives up on a disk that is perfectly fine.  The
+# wait is on the node, not on the label: a node that is present but carries the
+# wrong label is a real answer and ends the loop immediately.
+flx_find_by_label() {
+    _want=$1
+    _dev=
+    _tries=0
+    while [ "$_tries" -lt 50 ]; do
+        for _pt in /sys/class/block/*; do
+            [ -d "$_pt" ] || continue
+            _name=$(basename "$_pt")
+            _node="/dev/$_name"
+            [ -b "$_node" ] || continue
+            _out=$(blkid "$_node" 2>/dev/null || true)
+            _label=$(echo "$_out" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
+            if [ "$_label" = "$_want" ]; then
+                _dev=$_node
                 break
             fi
         done
+        [ -n "$_dev" ] && break
+        _tries=$((_tries + 1))
+        sleep 0.2
+    done
+    if [ -n "$_dev" ]; then
+        _type=$(blkid "$_dev" 2>/dev/null | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
+        printf '%s %s\n' "$_dev" "$_type"
+    fi
+}
+
+if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
+    # The data filesystem first: see the note above flx_find_by_label.
+    #
+    # Not fatal when it is absent.  A machine that was installed with sys or
+    # none has no such partition, and that is the normal case, not a failure.
+    # Failing to boot because an optional filesystem was not plugged in is worse
+    # than the filesystem being missing.
+    if ! grep -qs ' /var ' /proc/mounts; then
+        set -- $(flx_find_by_label FREELINX_VAR)
+        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
+            mkdir -p /var
+            grep -qs ' /var ' /proc/mounts \
+                || mount -t "$2" -o "defaults,noatime" "$1" /var 2>/dev/null \
+                || echo "FreeLinX: the data filesystem $1 is labelled FREELINX_VAR but did not mount at /var; /var is in RAM and nothing will survive a reboot" >&2
+        fi
+    fi
+
+    if ! grep -qs ' /home ' /proc/mounts; then
+        set -- $(flx_find_by_label FLX_HOME)
+        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
+            mkdir -p /home
+            grep -qs " /home " /proc/mounts \
+                || mount -t "$2" -o "defaults,noatime" "$1" /home 2>/dev/null
+        fi
+    fi
+
+    # The medium, read-only: this filesystem is the boot chain, and nothing on
+    # a running system has a reason to write to it.
+    if ! grep -qs ' /media/flx ' /proc/mounts; then
+        set -- $(flx_find_by_label FREELINX_MEDIUM)
+        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
+            mkdir -p /media/flx
+            mount -t "$2" -o "ro,noatime,nodev,nosuid" "$1" /media/flx 2>/dev/null ||
+                echo "FreeLinX: could not mount the medium $1 at /media/flx" >&2
+        fi
     fi
 fi
 

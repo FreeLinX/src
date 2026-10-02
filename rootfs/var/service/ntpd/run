@@ -1,2 +1,24 @@
 #!/bin/sh
-exec /sbin/ntpd -d -s
+# FreeLinX time daemon.
+#
+# Foreground (-d), because this runs under runit: a daemonised ntpd would have
+# no supervisor, no exit status, and no way for runsv to notice it had died.
+#
+# No -s.  openntpd 7.9p1 still accepts it and warns twice that it does nothing:
+#
+#     -s option no longer works and will be removed soon.
+#     Please reconfigure to use constraints or trusted servers.
+#
+# It was an alias for "set the clock as soon as the first reply arrives"; the
+# supported way to ask for that is a constraint line in /etc/ntpd.conf, and
+# setup-ntp.sh writes that file.  Passing -s anyway printed those two lines on
+# the console on every start, which is noise for a flag that does nothing.
+#
+# /etc/services must exist and must have an ntp/udp line, or ntpd exits
+# immediately at
+#
+#     ntp: getservbyname: No such file or directory
+#
+# and runsvdir restarts it, about once a second, forever.  See the comment at
+# the top of /etc/services.
+exec /sbin/ntpd -d -f /etc/ntpd.conf

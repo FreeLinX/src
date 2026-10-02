@@ -1,7 +1,25 @@
 # FreeLinX System Profile
 export PATH=/usr/share/X11/xtree/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin
-export TERM=xterm-256color
 export SHELL=/bin/sh
+
+# TERM follows the terminal, not the other way round.
+#
+# This file used to set TERM=xterm-256color outright, on every console.  That is
+# right on a virtual terminal and wrong on the serial line: the terminfo entry
+# for xterm-256color describes a 256-column screen, and a serial console at
+# 80x24 either finds no entry that fits or gets the wrong cursor addressing, so
+# every curses program that opens the screen - vim, nnn, htop, less - renders
+# wrong on a system that is otherwise fine.  The only thing that knows the answer
+# is the terminal this shell was started on, and tty(1) resolves to it.
+#
+# An inherited TERM is left alone, so ssh, su and the xorg service keep the one
+# their caller chose.
+case $(tty 2>/dev/null) in
+/dev/tty[0-9]*) _FLX_TERM=xterm-256color ;;
+*) _FLX_TERM=linux ;;
+esac
+export TERM=${TERM:-$_FLX_TERM}
+unset _FLX_TERM
 
 _UID=$(id -u 2>/dev/null || echo 0)
 if [ "$_UID" -eq 0 ]; then

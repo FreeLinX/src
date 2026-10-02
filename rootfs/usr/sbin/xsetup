@@ -1,0 +1,89 @@
+#!/bin/sh
+# FreeLinX /usr/sbin/xsetup - run the installer.
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 FreeLinX OS Project.
+#
+# The installer itself lives on the medium, in /installer, and not in this
+# filesystem: it is the one part of FreeLinX that writes to a disk, so it is the
+# one part that should be present only on the disc you chose to run it from.
+# base.iso mounts itself at /media/flx, and this is the name for "the installer
+# on that medium".  Without it the only way to install was to know that the
+# installer was on the disc and type its path:
+#
+#     mount /dev/cdrom /mnt
+#     sh /mnt/installer/xsetup
+#
+# which is a manual step in front of a command, and the step is the part that
+# goes wrong - /dev/cdrom does not exist on this system, and the bundled
+# mount(8) does no filesystem probing, so it needs a -t as well.
+#
+# Anything after the installer's name is passed through untouched, so
+# "xsetup --help" and "xsetup disk /dev/vda" reach the installer rather than
+# being interpreted here.
+
+set -u
+
+SELF=${0##*/}
+
+MEDIUM=${FLX_MEDIUM:-/media/flx}
+INSTALLER=$MEDIUM/installer/xsetup
+
+die() {
+	echo "$SELF: $*" >&2
+	exit 1
+}
+
+if [ -x "$INSTALLER" ]; then
+	exec /bin/sh "$INSTALLER" "$@"
+fi
+
+echo "$SELF: no installer at $INSTALLER" >&2
+
+# The medium is not mounted.  Mounting it is the right thing to do, because
+# every reason it is not there is temporary: the disc is in the drive and
+# /init has not seen it yet, or the operator booted from a USB stick and the
+# disc is still in the tray.
+#
+# The same by-label search /init uses, so the path chosen here is the path
+# /init would have used.  iso9660 is the filesystem a FreeLinX medium is, and
+# this system's mount(8) takes -t and does not work it out from the device.
+found=
+tries=0
+while [ "$tries" -lt 15 ]; do
+	for pt in /sys/class/block/*; do
+		[ -d "$pt" ] || continue
+		node=/dev/$(basename "$pt")
+		[ -b "$node" ] || continue
+		out=$(blkid "$node" 2>/dev/null || true)
+		case "$out" in
+		*'LABEL="FREELINX_MEDIUM"'*)
+			found=$node
+			break
+			;;
+		esac
+	done
+	[ -n "$found" ] && break
+	tries=$((tries + 1))
+	sleep 0.2
+done
+
+[ -n "$found" ] ||
+	die "the FreeLinX medium (a disc with this image on it) is not in the drive.
+       Insert it, or set FLX_MEDIUM to where the medium is mounted, or run the
+       installer from it directly:
+           mount -t iso9660 /dev/sr0 /mnt
+           sh /mnt/installer/xsetup"
+
+mkdir -p "$MEDIUM" 2>/dev/null ||
+	die "cannot create $MEDIUM"
+
+mount -t iso9660 -o ro,noatime,nodev,nosuid "$found" "$MEDIUM" ||
+	die "cannot mount $found at $MEDIUM"
+
+[ -x "$INSTALLER" ] ||
+	die "$MEDIUM is mounted but has no /installer/xsetup on it.
+       That is the boot-only image: it has no installer, and the 'base' image
+       has.  Boot base.iso instead."
+
+echo "$SELF: mounted $found at $MEDIUM and starting the installer" >&2
+exec /bin/sh "$INSTALLER" "$@"

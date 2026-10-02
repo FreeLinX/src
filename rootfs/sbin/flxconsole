@@ -1,0 +1,130 @@
+#!/bin/sh
+# FreeLinX /sbin/flxconsole - a login shell on every console this system has.
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 FreeLinX OS Project.
+#
+# The console a system has is named on its kernel command line, not in a file
+# this script can read, so it probes for the names and opens what it finds.
+# Both base images and every installed system are booted with
+#
+#     console=tty0 console=ttyS0,115200
+#
+# which is two consoles: the virtual terminal and the serial line.  Only ttyS0
+# is the kernel's /dev/console - console= is last-one-wins - so anything printed
+# by the kernel and by init goes out the serial port and nothing appears on the
+# screen.  A shell on both is the point: the serial line is what a headless
+# install is driven over, and the virtual terminal is what a person at the
+# machine sees.
+#
+# Both images and the installed system use this one script.  It was previously
+# a second copy of this logic written into the initramfs by scripts/initramfs.sh,
+# because src/rootfs/var/service/shell/run waited for /dev/ttyS1 - a name no
+# limine.conf or installed limine.conf in this tree ever asks for:
+#
+#     #!/bin/sh
+#     [ -e /dev/ttyS1 ] || exit 1
+#     exec /bin/sh -l < /dev/ttyS1 > /dev/ttyS1 2>&1
+#
+# runsvdir restarts a service that exits, so on a system with no /dev/ttyS1 that
+# script restarted forever and the installed system came up with no way in: no
+# prompt on the screen, none on the serial line, and nothing in the log but the
+# same two lines repeating.  It looked exactly like a hang.
+
+set -u
+
+export TERM=${TERM:-linux}
+export HOME=/root
+export USER=root
+export LOGNAME=root
+export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+# The virtual terminals worth having.  tty1 is the one console= names; tty2 and
+# tty3 are here so a second session is a keypress away rather than a reboot.
+# A fixed list rather than a glob over /dev/tty[0-9]: a name with no device
+# under it is skipped, and globbing would also pick up the kernel's "tty" and
+# "console" names.
+TTYS='/dev/ttyS0 /dev/tty1 /dev/tty2 /dev/tty3'
+
+# How long to keep looking for a console.  devtmpfs creates the nodes as the
+# kernel probes them and runsvdir starts this service immediately, so on a cold
+# boot there is briefly no ttyS0 to open.  A service that exits immediately is
+# restarted forever, which fills the log and never succeeds; waiting is the only
+# thing that helps, and 50 seconds is longer than any probe takes.
+WAIT_TRIES=50
+
+# Once there is one console, keep looking this many more seconds for the others.
+# tty2 and tty3 are allocated after tty1 and can land a moment later, and a
+# console that is never opened is a console you have to reboot to get.
+SETTLE_TRIES=5
+
+pids=
+opened=
+started=
+
+kill_children() {
+	trap - TERM INT HUP EXIT
+	for p in $pids; do
+		kill "$p" 2>/dev/null || :
+	done
+}
+trap kill_children TERM INT HUP
+trap kill_children EXIT
+
+# open_console TTY - put a login shell on TTY, in the background.
+#
+# Not exec: the parent has to keep running to hold the other consoles open and
+# to notice when they have all gone away.
+#
+# The banner is written to the terminal it belongs to, not to stdout.  stdout of
+# this service is inherited from /init, whose stdout is the kernel console - and
+# the kernel console is the *last* console= on the command line, which is ttyS0.
+# Announcing "login shell on /dev/tty1" on the serial line means the operator
+# looking at the screen sees a blank terminal and the operator on the serial line
+# sees a message about a terminal they are not using.  The one line that does go
+# to stdout is deliberate: on a machine with only one console it is how anyone
+# watching a serial log learns there is a prompt waiting.
+open_console() {
+	{
+		printf 'FreeLinX: login shell on %s\n' "$1"
+		printf '  xsetup - install FreeLinX to disk\n'
+	} >"$1" 2>/dev/null || :
+	echo "FreeLinX: login shell on $1"
+	/bin/sh -l <"$1" >"$1" 2>&1 &
+	pids="$pids $!"
+	opened="$opened $1"
+	started=yes
+}
+
+# open_new - open a shell on every console that has appeared and has not got one.
+open_new() {
+	for tty in $TTYS; do
+		case "$opened" in
+		*" $tty "*) continue ;;
+		esac
+		[ -c "$tty" ] || continue
+		open_console "$tty"
+	done
+}
+
+i=0
+while :; do
+	open_new
+	if [ -n "$started" ]; then
+		[ "$i" -ge "$SETTLE_TRIES" ] && break
+	else
+		[ "$i" -ge "$WAIT_TRIES" ] && break
+	fi
+	i=$((i + 1))
+	sleep 1
+done
+
+if [ -z "$started" ]; then
+	echo "FreeLinX: no console found (tried: $TTYS) after ${WAIT_TRIES}s" >&2
+	echo "FreeLinX: nothing is running a login shell; the system booted with no prompt." >&2
+	exit 1
+fi
+
+# Wait for every shell.  When the last one exits, exit too, so runsvdir starts a
+# fresh set rather than leaving the service nominally up with no prompt.
+wait
+exit 0

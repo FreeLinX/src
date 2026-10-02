@@ -231,55 +231,15 @@ else
 	# source tree rather than a second, drifting copy of it.
 	cp -a "$ROOTFS/." "$STAGE/"
 
-	# A console shell, so the normal image comes up to something you can type
-	# at.  The rootfs's own var/service/shell waits for /dev/ttyS1, which is
-	# the installed system's serial console; Limine hands this image
-	# console=ttyS0,115200, so that service would sit there failing and the
-	# system would come up supervised by runit with no way in - which looks
-	# exactly like a hang.
-	#
-	# It is added here rather than to src/rootfs/var/service so the installed
-	# system's service set is unchanged.
-	mkdir -p "$STAGE/var/service/flx-console"
-	cat >"$STAGE/var/service/flx-console/run" <<'CONSOLE_RUN'
-#!/bin/sh
-# A login shell on whatever console this system actually has.
-#
-# Limine passes console=ttyS0,115200, so the serial line is the one to use; a
-# virtual console is started too when the kernel made one, because a graphical
-# terminal with no serial line is a normal way to run this image.
-export TERM=${TERM:-linux}
-export HOME=/root
-export USER=root
-export LOGNAME=root
-
-started=
-for tty in /dev/ttyS0 /dev/tty1; do
-	[ -c "$tty" ] || continue
-	started=yes
-	/bin/sh -l <"$tty" >"$tty" 2>&1 &
-done
-
-# Nothing to attach to yet: the kernel may not have probed the serial port yet,
-# and a service that exits immediately is restarted forever by runsvdir, which
-# fills the log and never gives up.  Wait for a console instead.
-if [ -z "$started" ]; then
-	i=0
-	while [ "$i" -lt 50 ]; do
-		for tty in /dev/ttyS0 /dev/tty1; do
-			[ -c "$tty" ] || continue
-			exec /bin/sh -l <"$tty" >"$tty" 2>&1
-		done
-		i=$((i + 1))
-		sleep 1
-	done
-	echo 'flx-console: no console found (/dev/ttyS0, /dev/tty1)' >&2
-	exit 1
-fi
-
-wait
-CONSOLE_RUN
-	chmod 755 "$STAGE/var/service/flx-console/run"
+	# Nothing to add for the console.  src/rootfs/var/service/shell execs
+	# /sbin/flxconsole, which opens a shell on every console the kernel made,
+	# so this image and the installed system get the same one from the same
+	# place.  scripts/initramfs.sh used to write a second, shorter copy of that
+	# logic into the stage as var/service/flx-console, because the rootfs
+	# service waited for /dev/ttyS1 - a name no limine.conf in this tree asks
+	# for - and a service that exits is restarted by runsvdir forever.  Two
+	# copies of "give me a prompt" is two things to keep correct; the rootfs
+	# one is fixed instead.
 fi
 
 # --- the mount points the kernel expects ------------------------------------
@@ -315,11 +275,13 @@ if [ "$PROFILE" = normal ]; then
 	# rootfs whose only services are dbus/xorg - which both exit when there is
 	# no session - is reported here rather than as a system that boots to a
 	# blank screen.
-	if [ ! -d "$STAGE/var/service/flx-console" ] &&
-	   ! -d "$STAGE/var/service/shell"; then
-		die 'normal: /var/service has neither flx-console nor shell, so the
-     system would come up with no console to type at.'
-	fi
+	[ -d "$STAGE/var/service/shell" ] ||
+		die 'normal: no /var/service/shell, so the system would come up with no
+      console to type at.  Its run script execs /sbin/flxconsole.'
+	[ -x "$STAGE/sbin/flxconsole" ] ||
+		die 'normal: no /sbin/flxconsole, which /var/service/shell execs.  With
+      runit restarting a failed service forever, a missing one is a system with
+      no prompt on any console and nothing to say so.'
 fi
 
 # --- the archive ------------------------------------------------------------
@@ -368,8 +330,13 @@ normalise_inodes() {
 
 	while [ "$_pos" -lt "$_size" ]; do
 		# The magic, read as bytes: an all-zero field anywhere else in the
-		# header is not a reason to stop, only a bad magic is.
-		_m6=$(dd if="$_src" bs=1 skip="$_pos" count=6 2>/dev/null)
+		# header is not a reason to stop, only a bad magic is.  tr -d '\000'
+		# because the last read of the walk is six bytes of the archive's
+		# trailing padding, which are NUL, and $( ) drops a NUL with a warning
+		# on stderr that says nothing about what actually happened.  Dropping
+		# them here gives the same empty string the shell would have arrived at
+		# without the noise.
+		_m6=$(dd if="$_src" bs=1 skip="$_pos" count=6 2>/dev/null | tr -d '\000')
 		[ "$_m6" = 070701 ] || break
 
 		# Read the two size fields as bytes rather than as text.  cut -c on

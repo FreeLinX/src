@@ -68,6 +68,25 @@ Bring up wired (verified) or wireless (needs real hardware):
     flxwifi connect "MyNetwork" "password"
     dhcpcd wlan0
 
+### No desktop in this rootfs
+
+base is a minimal image: a shell on tty1, `xpkg`, `xsetup`, and the tools an
+installer needs. There is no X server, no window manager, no X client, no browser
+and no media player, and nothing graphical is started at boot. The runit
+services in `rootfs/var/service/` are `shell`, `mdevd`, `ntpd` and `dbus` — that
+is the whole list.
+
+This is not an accident of what got built. `base/scripts/strip-desktop.sh` runs
+as part of every `build-base.sh` and removes the desktop from the tree, so a
+desktop that reaches the rootfs cannot reach either image. It used to reach both:
+`var/service/xorg` started Xorg and openbox at boot, and ~180 MB of desktop and
+media software shipped in an image described as a shell. See the script's header
+for the list and why `tmux` is kept while `st` is not.
+
+The graphical console still works and is not a desktop: with no X client in the
+image no DRM driver loads, `CONFIG_FB` is off in the kernel, and vgacon draws
+directly to the VGA text buffer. That is the console, not a window manager.
+
 ### Interactive shell image
 For quick manual testing, a self-contained QEMU initramfs boots straight to
 a root shell with all of the above present:
