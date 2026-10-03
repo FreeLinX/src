@@ -59,6 +59,17 @@ elif [ -x /bin/toybox ]; then
 	SETSID='/bin/toybox setsid'
 fi
 
+# getty and login, for an installed system (see open_console).  Both are toybox
+# applets (the toybox package links them into /usr/bin); getty -l takes
+# one path, not a command line.  If either is missing an installed system
+# gives no shell at all - it does not fall back to an unauthenticated root
+# one - and says so on the console; "Rescue shell" in the boot menu is the way in.
+GETTY= LOGIN=
+if [ -x /usr/bin/getty ] && [ -x /usr/bin/login ]; then
+	GETTY=/usr/bin/getty
+	LOGIN=/usr/bin/login
+fi
+
 export TERM=${TERM:-linux}
 export SHELL=$LOGIN_SHELL
 export HOME=/root
@@ -124,6 +135,37 @@ open_console() {
 	# is still there for anyone who scrolls, and a terminal that has not been
 	# told about ESC[3J keeps it either way.
 	printf '\033[H\033[2J' >"$1" 2>/dev/null || :
+	# An installed system asks who you are.  The shell below is for the live
+	# medium only, where there is nothing to protect and no account to log in
+	# to; on a disk that xsetup or flxinstall has given a root password, a
+	# shell here would make that password decoration - anyone at the keyboard
+	# or on the serial line would be root.  getty prints /etc/issue and login
+	# prints /etc/motd, so the banner is still there.  Respawned per console,
+	# so logging out of one does not wait for every other console to log out.
+	if [ -e /etc/flx-installed ]; then
+		if [ -z "$GETTY" ]; then
+			printf 'FreeLinX: no getty/login on this system, so no login here.\n' >"$1" 2>/dev/null
+			printf 'Boot "Rescue shell" from the boot menu to repair it.\n' >"$1" 2>/dev/null
+			opened="$opened $1"
+			return
+		fi
+		_t=${1#/dev/}
+		case $_t in
+		ttyS*) _baud=115200 _term=vt100 ;;
+		*) _baud=38400 _term=linux ;;
+		esac
+		(
+			cd /
+			while :; do
+				$GETTY -l "$LOGIN" "$_baud" "$_t" "$_term"
+				sleep 1
+			done
+		) </dev/null >/dev/null 2>&1 &
+		pids="$pids $!"
+		opened="$opened $1"
+		started=yes
+		return
+	fi
 	cat /etc/motd >"$1" 2>/dev/null || :
 	# cd /root: runsvdir starts a service in the service directory, so a shell
 	# started from here opens in /var/service/shell.  Both services that
