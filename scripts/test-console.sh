@@ -240,14 +240,68 @@ fi
 # base, so a banner flxconsole does not write is a banner nobody sees.  The tty
 # above is /dev/null, so what it received cannot be read back; which file is
 # sent there is all that can be asked here.
-have "$ROOTFS/sbin/flxconsole" '/etc/motd' 'flxconsole shows /etc/motd'
+#
+# The name is not what is looked for.  /etc/motd is named in the comments above
+# the code that uses it, so grepping for the string proves nothing - an earlier
+# version of this check passed with the line deleted.  What is asked for is the
+# redirect: the banner goes to the terminal being opened.
+if grep -q 'cat /etc/motd >"\$1"' "$ROOTFS/sbin/flxconsole"; then
+	ok 'flxconsole writes /etc/motd to the console it is opening'
+else
+	no 'flxconsole does not write /etc/motd to the console'
+fi
 if [ -f "$ROOTFS/etc/motd" ]; then
 	ok '/etc/motd exists to be shown'
 else
 	no '/etc/motd is missing, so there is no banner at the prompt'
 fi
-have "$ROOTFS/sbin/flxconsole" '/etc/flx-shell' \
-	'flxconsole takes its shell from /etc/flx-shell'
+# The banner lands on a cleared screen.  ESC[2J on its own erases from the
+# cursor down, and the cursor is wherever the boot log finished, so the log would
+# stay and push the banner off the bottom of the screen.  ESC[H has to come
+# first, or the whole thing is in the wrong place.
+_flx_body=$(sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole")
+if printf '%s\n' "$_flx_body" | grep -q '033\[H.*033\[2J'; then
+	ok 'flxconsole clears the screen before the banner, home cursor first'
+else
+	no 'flxconsole does not clear the screen before the banner'
+fi
+if [ "$(printf '%s\n' "$_flx_body" | grep -c '033\[H')" = 1 ]; then
+	ok 'the banner is cleared once, not on every redraw'
+else
+	no 'the clear is written more than once in open_console'
+fi
+# And the clear has to come before the banner, not after, or the banner is what
+# gets wiped.
+_cl=$(printf '%s\n' "$_flx_body" | grep -n '033\[H' | cut -d: -f1)
+_ba=$(printf '%s\n' "$_flx_body" | grep -n 'cat /etc/motd' | cut -d: -f1)
+if [ -n "$_cl" ] && [ -n "$_ba" ] && [ "$_cl" -lt "$_ba" ]; then
+	ok 'the clear comes before the banner, so the banner survives'
+else
+	no 'the clear does not come before the banner'
+fi
+
+# A shell in a runit service has no controlling terminal.  It says so on every
+# start, and under those two lines Ctrl-C reaches nothing, because there is no
+# terminal to raise SIGINT from and no foreground job for it to interrupt.  Both
+# services flxconsole replaced ran `setsid -c` for exactly this, so dropping it
+# was a regression rather than a simplification.
+if printf '%s\n' "$_flx_body" | grep -q '\$SETSID -c "\$LOGIN_SHELL" -l'; then
+	ok 'flxconsole gives the shell a controlling terminal with setsid -c'
+else
+	no 'flxconsole starts the shell with no controlling terminal'
+fi
+# /usr/bin/setsid is in the released image and not in this tree, so a check that
+# only knows about that path would pass on a system that cannot run it.
+if grep -q "SETSID='/bin/toybox setsid'" "$ROOTFS/sbin/flxconsole"; then
+	ok 'it finds setsid through toybox where there is no /usr/bin/setsid'
+else
+	no 'it only knows about /usr/bin/setsid, which this tree does not have'
+fi
+if printf '%s\n' "$_flx_body" | grep -q 'cd /root 2>/dev/null || cd /'; then
+	ok 'flxconsole puts the shell in /root, not the service directory'
+else
+	no 'the shell opens in the service directory'
+fi
 
 # --- /var/log exists, and exists before any service could want it ------------
 echo '== /var/log =='

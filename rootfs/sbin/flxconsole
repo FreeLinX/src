@@ -47,6 +47,18 @@ set -u
 LOGIN_SHELL=$(cat /etc/flx-shell 2>/dev/null || : )
 [ -n "$LOGIN_SHELL" ] && [ -x "$LOGIN_SHELL" ] || LOGIN_SHELL=/bin/sh
 
+# setsid, for giving a shell a controlling terminal.  /usr/bin/setsid where the
+# image has one; where it does not, toybox carries the applet and this tree
+# deliberately does not symlink applets onto PATH - a NetBSD command of the same
+# name is a different program - so it is reached through the multiplexer.
+# Two words, which is why it is not quoted where it is used.
+SETSID=
+if [ -x /usr/bin/setsid ]; then
+	SETSID='/usr/bin/setsid'
+elif [ -x /bin/toybox ]; then
+	SETSID='/bin/toybox setsid'
+fi
+
 export TERM=${TERM:-linux}
 export SHELL=$LOGIN_SHELL
 export HOME=/root
@@ -100,8 +112,41 @@ trap kill_children EXIT
 # been given a shell on, one shell per terminal, and would print once per console
 # there is rather than once per person.
 open_console() {
+	# Clear before the banner.  The boot log has just gone past on this same
+	# terminal and there is no more coming, so leaving it there means the
+	# banner - the only thing a person is meant to read here - is pushed off
+	# the bottom of the screen and out of sight.  The log is still on the
+	# serial line, which is where it is meant to be read.
+	#
+	# ESC[H ESC[2J: cursor home, then erase the display including scrollback.
+	# ESC[2J alone erases from the cursor down, and the cursor is wherever the
+	# log finished, so the log stays on screen.  ESC[3J is not needed: the log
+	# is still there for anyone who scrolls, and a terminal that has not been
+	# told about ESC[3J keeps it either way.
+	printf '\033[H\033[2J' >"$1" 2>/dev/null || :
 	cat /etc/motd >"$1" 2>/dev/null || :
-	"$LOGIN_SHELL" -l <"$1" >"$1" 2>&1 &
+	# cd /root: runsvdir starts a service in the service directory, so a shell
+	# started from here opens in /var/service/shell.  Both services that
+	# flxconsole replaced did this before starting their shell, and losing it
+	# with them is why the prompt used to appear in the wrong place.
+	cd /root 2>/dev/null || cd /
+	# setsid -c: a shell needs the terminal to be its controlling terminal, and
+	# a runit service has none.  Without this the shell is in a session with no
+	# terminal in it and says so on every start:
+	#
+	#     /bin/mksh: No controlling tty: open /dev/tty: No such device or address
+	#     /bin/mksh: warning: won't have full job control
+	#
+	# and under those two lines Ctrl-C reaches nothing, because there is no
+	# terminal to raise SIGINT from and no foreground job for it to interrupt.
+	# Both services flxconsole replaced ran `setsid -c` for exactly this, and
+	# losing it with them is a regression rather than a simplification.
+	if [ -n "$SETSID" ]; then
+		# shellcheck disable=SC2086  # SETSID may be two words
+		$SETSID -c "$LOGIN_SHELL" -l <"$1" >"$1" 2>&1 &
+	else
+		"$LOGIN_SHELL" -l <"$1" >"$1" 2>&1 &
+	fi
 	pids="$pids $!"
 	opened="$opened $1"
 	started=yes
