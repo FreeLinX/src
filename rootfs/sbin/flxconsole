@@ -7,14 +7,19 @@
 # this script can read, so it probes for the names and opens what it finds.
 # Both base images and every installed system are booted with
 #
-#     console=tty0 console=ttyS0,115200
+#     console=ttyS0,115200 console=tty0
 #
-# which is two consoles: the virtual terminal and the serial line.  Only ttyS0
-# is the kernel's /dev/console - console= is last-one-wins - so anything printed
-# by the kernel and by init goes out the serial port and nothing appears on the
-# screen.  A shell on both is the point: the serial line is what a headless
-# install is driven over, and the virtual terminal is what a person at the
-# machine sees.
+# which is two consoles: the serial line and the virtual terminal.  Both of
+# them receive everything the kernel prints.  Only the last one is
+# /dev/console - console= is last-one-wins - so the screen is what /init and
+# the services it starts write to.  A shell on both is the point: the serial
+# line is what a headless install is driven over, and the virtual terminal is
+# what a person at the machine sees.
+#
+# tty0 last is deliberate.  With it last on a serial line, /dev/console is a
+# device that may not be wired to anything, and every write to it fails; and
+# with it first, init's output went to a terminal nobody was looking at while
+# the boot log scrolled past on the screen above the prompt.
 #
 # Both images and the installed system use this one script.  It was previously
 # a second copy of this logic written into the initramfs by scripts/initramfs.sh,
@@ -77,18 +82,23 @@ trap kill_children EXIT
 #
 # The banner is written to the terminal it belongs to, not to stdout.  stdout of
 # this service is inherited from /init, whose stdout is the kernel console - and
-# the kernel console is the *last* console= on the command line, which is ttyS0.
-# Announcing "login shell on /dev/tty1" on the serial line means the operator
-# looking at the screen sees a blank terminal and the operator on the serial line
-# sees a message about a terminal they are not using.  The one line that does go
-# to stdout is deliberate: on a machine with only one console it is how anyone
-# watching a serial log learns there is a prompt waiting.
+# the kernel console is the *last* console= on the command line, which is tty0.
+# Announcing "login shell on /dev/tty1" on some other line means the operator
+# looking at the screen sees a blank terminal and whoever is watching that other
+# line sees a message about a terminal they are not using.
+#
+# There used to be one deliberate line to stdout as well, for a machine with a
+# single console that nobody was looking at.  There is no such machine now: every
+# console= line in this tree ends in console=tty0, so stdout is the screen, and
+# the line printed the same two lines twice on the one terminal that exists.
+# Whoever is watching the serial line sees the prompt itself - the shell below
+# writes its own prompt straight to that terminal - which is what the line was
+# standing in for.
 open_console() {
 	{
 		printf 'FreeLinX: login shell on %s\n' "$1"
 		printf '  xsetup - install FreeLinX to disk\n'
 	} >"$1" 2>/dev/null || :
-	echo "FreeLinX: login shell on $1"
 	/bin/sh -l <"$1" >"$1" 2>&1 &
 	pids="$pids $!"
 	opened="$opened $1"

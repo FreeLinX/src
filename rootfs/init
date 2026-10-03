@@ -2,8 +2,8 @@
 # FreeLinX /init - runit-based init with a bootstrap rescue fallback.
 #
 # pid 1: mount the pseudo filesystems, bring up the hostname, then exec
-# runsvdir to supervise the services in /var/service (dbus, ..., X/Openbox
-# session). If runsvdir is missing we drop to a rescue shell.
+# runsvdir to supervise the services in /var/service (dbus, ntpd, and the login
+# shell). If runsvdir is missing we drop to a rescue shell.
 
 set -eu
 
@@ -21,6 +21,15 @@ export ENV=/etc/profile
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
 
 umask 022
+
+# --- /var/log -----------------------------------------------------------------
+# A runit service has nowhere to write but /dev/console otherwise, and
+# /dev/console is the terminal the operator is typing on.  ntpd -d logs to
+# stderr, dbus prints its bus address to stdout, and both of those landed on
+# the keyboard.  /var is on the initramfs here and on FLX_VAR or tmpfs once
+# installed, so this is a directory that has to exist at every boot.
+mkdir -p /var/log
+chmod 755 /var/log
 
 # --- pseudo filesystems -----------------------------------------------------
 mount -t proc     proc     /proc 2>/dev/null || :
@@ -47,10 +56,16 @@ unset _fd
 mount -t tmpfs    tmpfs    /run   2>/dev/null || :
 
 # --- Device Manager (mdevd) & Driver Auto-Probe ------------------------------
+#
+# mdevd starts here and not under runsvdir: the mount scan below, flxdriver and
+# every service need /dev populated, and a service would not be listening yet.
+# There was also a var/service/mdevd, so two mdevd processes raced for the one
+# uevent netlink socket.  One bound it, one failed, and runsvdir restarted the
+# loser about once a second for the life of the system.
 if [ -x /sbin/mdevd ]; then
-    /sbin/mdevd -f /etc/mdev.conf >/dev/null 2>&1 &
+    /sbin/mdevd -f /etc/mdev.conf >>/var/log/mdevd.log 2>&1 &
     if [ -x /sbin/mdevd-coldplug ]; then
-        /sbin/mdevd-coldplug >/dev/null 2>&1 || :
+        /sbin/mdevd-coldplug >>/var/log/mdevd.log 2>&1 || :
     fi
 fi
 if [ -x /sbin/flxdriver ]; then

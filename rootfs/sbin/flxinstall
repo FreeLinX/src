@@ -272,21 +272,27 @@ fi
 
 # Generate Limine configuration (Limine v12.x syntax: lowercase keys,
 # nested entries, boot(): device prefix, module_path for initramfs).
+# console=tty0 last, so /dev/console is the screen: every console= on the line
+# gets the kernel's output, and the last one is where /init writes.  No quiet
+# loglevel=2 - that pair printed nothing at all on a successful boot.
 cat > "$BOOT_DIR/limine.conf" << EOF
 timeout: 5
 serial: yes
+# textmode: a BIOS boot hands over a text screen rather than a framebuffer, so
+# vgacon has a console.  Ignored on UEFI, which has no text mode to hand over.
+textmode: yes
 
 /FreeLinX (Initramfs Desktop)
     protocol: linux
     kernel_path: boot():/boot/bzImage
     module_path: boot():/boot/initramfs.img.gz
-    cmdline: rdinit=/init console=tty0 console=ttyS0,115200 quiet loglevel=2
+    cmdline: rdinit=/init rootfstype=ramfs console=ttyS0,115200 console=tty0
 
 /FreeLinX (Rescue Shell)
     protocol: linux
     kernel_path: boot():/boot/bzImage
     module_path: boot():/boot/initramfs.img.gz
-    cmdline: rdinit=/init init=/bin/sh console=tty0 console=ttyS0,115200
+    cmdline: rdinit=/init rootfstype=ramfs init=/bin/sh console=ttyS0,115200 console=tty0
 EOF
 
 # Copy config to standard Limine lookup locations

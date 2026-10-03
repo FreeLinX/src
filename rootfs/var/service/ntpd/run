@@ -21,4 +21,9 @@
 #
 # and runsvdir restarts it, about once a second, forever.  See the comment at
 # the top of /etc/services.
-exec /sbin/ntpd -d -f /etc/ntpd.conf
+#
+# -d also logs to stderr, and this service's stderr is the kernel console,
+# which is the terminal somebody is typing on.  So ntpd's entire foreground log
+# - every sync, every peer it rejects - went onto the keyboard.  It goes to
+# /var/log/ntpd.log instead, and tail is how you read it.
+exec /sbin/ntpd -d -f /etc/ntpd.conf >>/var/log/ntpd.log 2>&1

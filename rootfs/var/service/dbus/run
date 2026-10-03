@@ -8,7 +8,11 @@ if [ ! -s /var/lib/dbus/machine-id ]; then
     dbus-uuidgen > /var/lib/dbus/machine-id
 fi
 [ -e /etc/machine-id ] || cp /var/lib/dbus/machine-id /etc/machine-id
+# --print-address=1 writes the resolved bus address to stdout, which is the
+# kernel console, so every boot announced a unix:path on the keyboard.  The
+# address is not variable here: --address above pins it and /init exports the
+# same string, so nothing reads it off stdout.  Dropped rather than redirected.
 exec dbus-daemon \
     --config-file=/etc/dbus-1/session.conf \
     --address=unix:path=/run/dbus/system_bus_socket \
-    --nofork --print-address=1
+    --nofork
