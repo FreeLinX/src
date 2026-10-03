@@ -37,7 +37,18 @@
 
 set -u
 
+# The shell a person gets at the prompt, named by /etc/flx-shell.  base writes
+# that file as /bin/mksh - mksh for people, /bin/sh for scripts - and sets root's
+# login shell to match; the desktop tree has no such file and its /bin/sh is
+# what this falls back to.  Reading the file rather than hardcoding a name is
+# what lets the two agree: they were separate decisions written down twice, and
+# when only one of them changed, the console quietly gave a different shell from
+# the one /etc/passwd said root had.
+LOGIN_SHELL=$(cat /etc/flx-shell 2>/dev/null || : )
+[ -n "$LOGIN_SHELL" ] && [ -x "$LOGIN_SHELL" ] || LOGIN_SHELL=/bin/sh
+
 export TERM=${TERM:-linux}
+export SHELL=$LOGIN_SHELL
 export HOME=/root
 export USER=root
 export LOGNAME=root
@@ -80,26 +91,17 @@ trap kill_children EXIT
 # Not exec: the parent has to keep running to hold the other consoles open and
 # to notice when they have all gone away.
 #
-# The banner is written to the terminal it belongs to, not to stdout.  stdout of
-# this service is inherited from /init, whose stdout is the kernel console - and
-# the kernel console is the *last* console= on the command line, which is tty0.
-# Announcing "login shell on /dev/tty1" on some other line means the operator
-# looking at the screen sees a blank terminal and whoever is watching that other
-# line sees a message about a terminal they are not using.
-#
-# There used to be one deliberate line to stdout as well, for a machine with a
-# single console that nobody was looking at.  There is no such machine now: every
-# console= line in this tree ends in console=tty0, so stdout is the screen, and
-# the line printed the same two lines twice on the one terminal that exists.
-# Whoever is watching the serial line sees the prompt itself - the shell below
-# writes its own prompt straight to that terminal - which is what the line was
-# standing in for.
+# /etc/motd is the banner, and this is the only thing that can write it: base
+# has no getty and no login, so from boot to prompt there is nothing else on a
+# console.  It goes to the terminal it belongs to, never to stdout - stdout is
+# inherited from /init, whose stdout is the kernel console, and the kernel
+# console is the *last* console= on the command line, which is tty0.  Written to
+# stdout, the banner would be handed to a screen that a runit service has already
+# been given a shell on, one shell per terminal, and would print once per console
+# there is rather than once per person.
 open_console() {
-	{
-		printf 'FreeLinX: login shell on %s\n' "$1"
-		printf '  xsetup - install FreeLinX to disk\n'
-	} >"$1" 2>/dev/null || :
-	/bin/sh -l <"$1" >"$1" 2>&1 &
+	cat /etc/motd >"$1" 2>/dev/null || :
+	"$LOGIN_SHELL" -l <"$1" >"$1" 2>&1 &
 	pids="$pids $!"
 	opened="$opened $1"
 	started=yes

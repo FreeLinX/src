@@ -222,8 +222,6 @@ then
 	elif [ -s "$TMP/flx.out" ]; then
 		no 'flxconsole printed to stdout, which is the screen'
 		sed 's/^/       /' "$TMP/flx.out"
-	elif grep -q 'login shell on' "$TMP/flx.out"; then
-		no 'flxconsole put its banner on stdout instead of the terminal'
 	else
 		ok 'flxconsole puts its banner on the terminal and nothing on stdout'
 	fi
@@ -236,8 +234,20 @@ then
 		ok 'flxconsole says nothing on stderr either'
 	fi
 else
-	printf '  (no unshare -r -m: cannot run flxconsole, skipping)\\n'
+	printf '  (no unshare -r -m: cannot run flxconsole, skipping)\n'
 fi
+# Nothing else on this system shows /etc/motd: there is no getty and no login in
+# base, so a banner flxconsole does not write is a banner nobody sees.  The tty
+# above is /dev/null, so what it received cannot be read back; which file is
+# sent there is all that can be asked here.
+have "$ROOTFS/sbin/flxconsole" '/etc/motd' 'flxconsole shows /etc/motd'
+if [ -f "$ROOTFS/etc/motd" ]; then
+	ok '/etc/motd exists to be shown'
+else
+	no '/etc/motd is missing, so there is no banner at the prompt'
+fi
+have "$ROOTFS/sbin/flxconsole" '/etc/flx-shell' \
+	'flxconsole takes its shell from /etc/flx-shell'
 
 # --- /var/log exists, and exists before any service could want it ------------
 echo '== /var/log =='
