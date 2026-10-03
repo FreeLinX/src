@@ -59,6 +59,33 @@ elif [ -x /bin/toybox ]; then
 	SETSID='/bin/toybox setsid'
 fi
 
+# getty and login, for a system that has been installed.
+#
+# On the live medium a root shell is the entire point: there is nothing
+# installed to log in to, and the person at the keyboard is supposed to be
+# root.  On an installed system that is a hole.  xsetup asked for a root
+# password and wrote it into /etc/shadow, and a console that opens a shell
+# without asking makes that password decorative - anyone who can reach the
+# keyboard or the serial port is root, and the serial port is often on a
+# network or a hypervisor console.  1.0.8 through 1.0.11 asked for a login here
+# and this does not, which is a regression and not a simplification.
+#
+# So: /etc/flx-installed decides.  It exists only once setup-disk has run.
+#
+# util-linux's getty and login where the image has them, toybox's applets where
+# it does not - the tree does not symlink applets onto PATH, because a NetBSD
+# command of the same name is a different program.
+GETTY=
+LOGINPROG=
+if [ -x /usr/bin/getty ]; then
+	GETTY=/usr/bin/getty
+	[ -x /usr/libexec/toybox/login ] && LOGINPROG=/usr/libexec/toybox/login
+	[ -x /bin/login ] && LOGINPROG=/bin/login
+elif [ -x /bin/toybox ]; then
+	GETTY='/bin/toybox getty'
+	LOGINPROG='/bin/toybox login'
+fi
+
 export TERM=${TERM:-linux}
 export SHELL=$LOGIN_SHELL
 export HOME=/root
@@ -120,11 +147,42 @@ open_console() {
 	#
 	# ESC[H ESC[2J: cursor home, then erase the display including scrollback.
 	# ESC[2J alone erases from the cursor down, and the cursor is wherever the
-	# log finished, so the log stays on screen.  ESC[3J is not needed: the log
-	# is still there for anyone who scrolls, and a terminal that has not been
-	# told about ESC[3J keeps it either way.
+	# log finished, so the log stays on screen.
 	printf '\033[H\033[2J' >"$1" 2>/dev/null || :
 	cat /etc/motd >"$1" 2>/dev/null || :
+	# An installed system asks for a login.  See GETTY above for why, and for
+	# why the answer is never "carry on and open a shell anyway": that is the
+	# hole.  A system with no getty gets a console that says so, which is a
+	# nuisance, rather than one that hands out root.
+	if [ -e /etc/flx-installed ]; then
+		if [ -n "$GETTY" ] && [ -n "$LOGINPROG" ]; then
+			case $1 in
+			*/ttyS[0-9]*) _baud=115200; _term=vt100 ;;
+			*)             _baud=38400;  _term=linux ;;
+			esac
+			# shellcheck disable=SC2086  # GETTY may be two words
+			$GETTY -l "$LOGINPROG" "$_baud" "$1" "$_term" &
+		else
+			# No getty on a system that is installed.  The console is left
+			# alone rather than handed a root shell, because that is the hole
+			# this branch exists to close, and the way out is the boot menu's
+			# rescue entry, which is a deliberate choice by a person at the
+			# keyboard rather than the default state of every console.
+			printf 'FreeLinX: %s is installed and has no getty, so no login is started on it.\n' "$1" >&2
+			printf 'FreeLinX: use the boot menu'"'"'s rescue shell, or fix getty on this medium.\n' >&2
+			opened="$opened $1"
+			return 0
+		fi
+		pids="$pids $!"
+		opened="$opened $1"
+		started=yes
+		return 0
+	fi
+	# cd /root: runsvdir starts a service in the service directory, so a shell
+	# started from here opens in /var/service/shell.  Both services that
+	# flxconsole replaced did this before starting their shell, and losing it
+	# with them is why the prompt used to appear in the wrong place.
+	cd /root 2>/dev/null || cd /
 	# cd /root: runsvdir starts a service in the service directory, so a shell
 	# started from here opens in /var/service/shell.  Both services that
 	# flxconsole replaced did this before starting their shell, and losing it

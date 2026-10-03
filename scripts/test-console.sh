@@ -303,6 +303,39 @@ else
 	no 'the shell opens in the service directory'
 fi
 
+# An installed system has a root password, so its consoles have to ask for it.
+# A console that opens a shell regardless makes the password decorative.
+if grep -q '/etc/flx-installed' "$ROOTFS/sbin/flxconsole"; then
+	ok 'flxconsole can tell an installed system from the live medium'
+else
+	no 'flxconsole cannot tell an installed system from the live medium'
+fi
+if sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
+	grep -q 'GETTY -l "\$LOGINPROG"'
+then
+	ok 'an installed system gets a getty asking for a login'
+else
+	no 'an installed system gets no login prompt'
+fi
+# The check that matters: the shell must be on the far side of that test, so a
+# missing getty cannot quietly fall through to it.
+_live=$(sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
+	grep -n 'if \[ -e /etc/flx-installed \]' | cut -d: -f1)
+# Two lines start the shell - the normal one and the no-setsid fallback - and
+# the first is the one that has to sit behind the installed-system test.
+_shell=$(sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
+	grep -n 'LOGIN_SHELL" -l' | head -1 | cut -d: -f1)
+if [ -n "$_live" ] && [ -n "$_shell" ] && [ "$_live" -lt "$_shell" ]; then
+	ok 'the installed-system test comes before the shell is started'
+else
+	no 'the shell can be started without the installed-system test'
+fi
+if grep -q "GETTY='/bin/toybox getty'" "$ROOTFS/sbin/flxconsole"; then
+	ok 'it finds getty through toybox, since /usr/bin/getty is not in this tree'
+else
+	no 'it only knows about /usr/bin/getty, which this tree does not have'
+fi
+
 # --- /var/log exists, and exists before any service could want it ------------
 echo '== /var/log =='
 if [ -d "$ROOTFS/var/log" ]; then
