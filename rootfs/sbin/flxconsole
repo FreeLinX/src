@@ -134,7 +134,12 @@ WAIT_TRIES=50
 SETTLE_TRIES=5
 
 pids=
-opened=
+# A word list with a space on both ends of it.  " $a $b " is the only shape
+# where " $tty " matches every element and not just the first, and the last
+# console to be opened is the one that used to be missed: open_new looked for
+# " $tty " in a list that ended without a trailing space, never found it, and
+# started a second login on the console it had just finished opening.
+opened=' '
 started=
 
 kill_children() {
@@ -143,13 +148,18 @@ kill_children() {
 		kill "$p" 2>/dev/null || :
 	done
 }
-trap kill_children TERM INT HUP
+# exit after the cleanup, not just cleanup: the loop at the end of this script
+# waits on something TERM does not kill, so a trap that only tidied up would
+# leave runsvdir with a service that has to be sent a KILL to go away.
+trap 'kill_children; exit 0' TERM INT HUP
 trap kill_children EXIT
 
-# open_console TTY - put a login shell on TTY, in the background.
-#
-# Not exec: the parent has to keep running to hold the other consoles open and
-# to notice when they have all gone away.
+# login_available - is there a login for a console of an installed system to ask?
+login_available() {
+	[ -n "$GETTY" ] && [ -n "$LOGINPROG" ]
+}
+
+# start_console TTY - put one login on TTY, as a child of whoever calls this.
 #
 # /etc/motd is the banner, and this is the only thing that can write it: base
 # has no getty and no login, so from boot to prompt there is nothing else on a
@@ -159,7 +169,7 @@ trap kill_children EXIT
 # stdout, the banner would be handed to a screen that a runit service has already
 # been given a shell on, one shell per terminal, and would print once per console
 # there is rather than once per person.
-open_console() {
+start_console() {
 	# Clear before the banner.  The boot log has just gone past on this same
 	# terminal and there is no more coming, so leaving it there means the
 	# banner - the only thing a person is meant to read here - is pushed off
@@ -176,33 +186,20 @@ open_console() {
 	# hole.  A system with no getty gets a console that says so, which is a
 	# nuisance, rather than one that hands out root.
 	if [ -e /etc/flx-installed ]; then
-		if [ -n "$GETTY" ] && [ -n "$LOGINPROG" ]; then
-			case $1 in
-			*/ttyS[0-9]*) _baud=115200; _term=vt100 ;;
-			*)             _baud=38400;  _term=linux ;;
-			esac
-			# shellcheck disable=SC2086  # GETTY may be two words
-			$GETTY -l "$LOGINPROG" "$_baud" "$1" "$_term" &
-		else
-			# No getty on a system that is installed.  The console is left
-			# alone rather than handed a root shell, because that is the hole
-			# this branch exists to close, and the way out is the boot menu's
-			# rescue entry, which is a deliberate choice by a person at the
-			# keyboard rather than the default state of every console.
-			printf 'FreeLinX: %s is installed and has no getty, so no login is started on it.\n' "$1" >&2
-			printf 'FreeLinX: use the boot menu'"'"'s rescue shell, or fix getty on this medium.\n' >&2
-			opened="$opened $1"
-			return 0
-		fi
-		pids="$pids $!"
-		opened="$opened $1"
-		started=yes
+		case $1 in
+		*/ttyS[0-9]*) _baud=115200; _term=vt100 ;;
+		*)             _baud=38400;  _term=linux ;;
+		esac
+		# shellcheck disable=SC2086  # GETTY may be two words
+		$GETTY -l "$LOGINPROG" "$_baud" "$1" "$_term" &
 		return 0
 	fi
 	# cd /root: runsvdir starts a service in the service directory, so a shell
 	# started from here opens in /var/service/shell.  Both services that
 	# flxconsole replaced did this before starting their shell, and losing it
-	# with them is why the prompt used to appear in the wrong place.
+	# with them is why the prompt used to appear in the wrong place.  It is
+	# done here, in the process that starts the shell, so that the shell
+	# inherits it and the shell that starts the other consoles does not.
 	cd /root 2>/dev/null || cd /
 	# setsid -c: a shell needs the terminal to be its controlling terminal, and
 	# a runit service has none.  Without this the shell is in a session with no
@@ -221,19 +218,80 @@ open_console() {
 	else
 		"$LOGIN_SHELL" -l <"$1" >"$1" 2>&1 &
 	fi
-	pids="$pids $!"
-	opened="$opened $1"
-	started=yes
 }
 
-# open_new - open a shell on every console that has appeared and has not got one.
+# supervise TTY - keep one console usable for as long as that console is there.
+#
+# A process on a console is not expected to come back by itself.  getty execs the
+# login program, and when that login ends getty ends with it; the shell ends when
+# the person types Ctrl-D.  So a console that had one session and then nothing
+# was a console that looked as though it had stopped working, and nothing said
+# otherwise: on this image ttyS0 asked for a login, took one, and was then silent
+# for ever, because this script waited for all four of its consoles at once and
+# the other three were still up.
+#
+# So each console is waited for on its own and given a new process when it ends.
+# A new session gets the banner again, which is what somebody arriving at that
+# console should see.
+#
+# This is run in the background, which makes it a subshell, and that is what makes
+# the wait below mean anything: a shell can only wait for its own children.  A
+# supervisor that was handed the pid of a console somebody else started would
+# have wait(1) fail at once - the process is not its child - and would then open
+# a second login on that terminal every second, which is worse than the silence
+# it was written to stop.
+supervise() {
+	_t=$1
+	_kids=
+	trap 'for _k in $_kids; do kill "$_k" 2>/dev/null; done; exit 0' TERM INT HUP
+	if [ -e /etc/flx-installed ] && ! login_available; then
+		# No getty on a system that is installed.  The console is left alone
+		# rather than handed a root shell, because that is the hole this
+		# branch exists to close, and the way out is the boot menu's rescue
+		# entry, which is a deliberate choice by a person at the keyboard
+		# rather than the default state of every console.  It is said once
+		# and not once a second, which is what looping over this would do.
+		printf 'FreeLinX: %s is installed and has no getty, so no login is started on it.\n' "$_t" >&2
+		printf 'FreeLinX: use the boot menu'"'"'s rescue shell, or fix getty on this medium.\n' >&2
+		return 0
+	fi
+	while [ -c "$_t" ]; do
+		# Called, not backgrounded.  A function is part of the shell that calls
+		# it, so the console it starts is a child of this supervisor and $! is
+		# that console's pid; run the call with a & of its own and $! would be
+		# the pid of a subshell that has already exited by the time the wait
+		# below starts looking at it, and every wait would come back at once.
+		start_console "$_t"
+		_c=$!
+		_kids="$_kids $_c"
+		wait "$_c" 2>/dev/null || :
+		# The second before reopening is the delay runsvdir gives before it
+		# restarts a service, and it is what keeps a console whose process
+		# dies at once - a login program that cannot start, a shell with no
+		# terminal - from becoming a loop that fills the log.
+		sleep 1
+	done
+	exit 0
+}
+
+# open_new - start a supervisor on every console that has appeared and has not
+# got one.
 open_new() {
 	for tty in $TTYS; do
 		case "$opened" in
 		*" $tty "*) continue ;;
 		esac
 		[ -c "$tty" ] || continue
-		open_console "$tty"
+		opened="$opened$tty "
+		supervise "$tty" &
+		pids="$pids $!"
+		# A supervisor on an installed system with no getty says so and
+		# exits.  Counting it as started would leave this script waiting for
+		# a console that was never going to have a login on it.
+		if [ -e /etc/flx-installed ] && ! login_available; then
+			continue
+		fi
+		started=yes
 	done
 }
 
@@ -255,7 +313,13 @@ if [ -z "$started" ]; then
 	exit 1
 fi
 
-# Wait for every shell.  When the last one exits, exit too, so runsvdir starts a
-# fresh set rather than leaving the service nominally up with no prompt.
-wait
-exit 0
+# The consoles are looked after by their own supervisors, so this does not wait
+# for them: a service that exits when its last console process does relies on
+# runsvdir to start a fresh one, and in between the machine has no prompt at all.
+# It stays up instead, and runsvdir restarts it if it ever does exit.
+while :; do
+	# sleep in the background so that TERM reaches this loop rather than being
+	# held up by a sleep that has not finished.
+	sleep 3600 &
+	wait $!
+done

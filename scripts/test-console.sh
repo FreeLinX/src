@@ -260,7 +260,7 @@ fi
 # cursor down, and the cursor is wherever the boot log finished, so the log would
 # stay and push the banner off the bottom of the screen.  ESC[H has to come
 # first, or the whole thing is in the wrong place.
-_flx_body=$(sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole")
+_flx_body=$(sed -n '/^start_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole")
 if printf '%s\n' "$_flx_body" | grep -q '033\[H.*033\[2J'; then
 	ok 'flxconsole clears the screen before the banner, home cursor first'
 else
@@ -269,7 +269,7 @@ fi
 if [ "$(printf '%s\n' "$_flx_body" | grep -c '033\[H')" = 1 ]; then
 	ok 'the banner is cleared once, not on every redraw'
 else
-	no 'the clear is written more than once in open_console'
+	no 'the clear is written more than once in start_console'
 fi
 # And the clear has to come before the banner, not after, or the banner is what
 # gets wiped.
