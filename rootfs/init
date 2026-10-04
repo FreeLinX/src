@@ -56,7 +56,7 @@ unset _fd
 # initramfs the kernel unpacked into RAM, and there is nothing to check.
 ON_DISK=no
 case $(awk '$2 == "/" { t = $3 } END { print t }' /proc/mounts) in
-rootfs|ramfs|tmpfs|'') ;;
+rootfs|ramfs|tmpfs|overlay|'') ;;
 *) ON_DISK=yes ;;
 esac
 if [ "$ON_DISK" = yes ]; then
