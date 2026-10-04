@@ -1,8 +1,12 @@
 #!/bin/sh
 # FreeLinX User Creation Utility (flxadduser)
 #
-# Adds desktop users with proper group memberships (wheel, video, audio, input, disk)
-# and seeds their retro desktop configuration.
+#   flxadduser NAME [--admin]
+#
+# Adds a user with a home directory, the groups a console user needs (video,
+# audio, storage, input, users) and a password.  --admin also puts them in
+# wheel, which doas.conf lets run commands as root: it is asked for, never
+# given by default.
 #
 # Copyright (c) 2026 FreeLinX OS Project.
 # SPDX-License-Identifier: BSD-2-Clause
@@ -14,7 +18,9 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-NEW_USER="$1"
+NEW_USER="${1:-}"
+ADMIN=no
+[ "${2:-}" = --admin ] && ADMIN=yes
 if [ -z "$NEW_USER" ]; then
     printf "Enter new username: "
     read -r NEW_USER
@@ -62,54 +68,29 @@ fi
 # Add primary group to /etc/group
 echo "$NEW_USER:x:$USER_GID:" >> /etc/group
 
-# Add to the desktop groups flxinstall uses.  Not "disk": raw block device
-# access is root in all but name.  Groups the system lacks are skipped.
-for grp in wheel video audio storage input users; do
+# The groups a console user needs.  Not "disk": raw block device access is
+# root in all but name.  wheel only with --admin.  Groups the system lacks are
+# skipped.
+_groups='video audio storage input users'
+[ "$ADMIN" = yes ] && _groups="wheel $_groups"
+for grp in $_groups; do
     grep -q "^$grp:" /etc/group || continue
     awk -F: -v g="$grp" -v u="$NEW_USER" 'BEGIN { OFS = ":" }
         $1 == g { $4 = ($4 == "" ? u : $4 "," u) } { print }' /etc/group > /etc/group.flx &&
         cat /etc/group.flx > /etc/group && rm -f /etc/group.flx
 done
 
-# Create home directory & skel
-mkdir -p "$HOME_DIR/.config/openbox" "$HOME_DIR/.local/share" "$HOME_DIR/.cache"
+mkdir -p "$HOME_DIR"
+# The login shell reads /etc/profile, which sets PATH, the prompt and TERM;
+# a user's own .profile only has to exist.
+[ -e "$HOME_DIR/.profile" ] || printf '# %s\n' "$NEW_USER's login settings; /etc/profile is read first" >"$HOME_DIR/.profile"
 
-# Copy Openbox retro desktop configs if available
-if [ -d /root/.config/openbox ]; then
-    cp -a /root/.config/openbox/* "$HOME_DIR/.config/openbox/" 2>/dev/null || :
-fi
-if [ ! -e "$HOME_DIR/.config/openbox/rc.xml" ]; then
-    ln -sf /etc/xdg/openbox/rc.xml "$HOME_DIR/.config/openbox/rc.xml" 2>/dev/null || :
-fi
-if [ ! -e "$HOME_DIR/.config/openbox/menu.xml" ]; then
-    ln -sf /etc/xdg/openbox/menu.xml "$HOME_DIR/.config/openbox/menu.xml" 2>/dev/null || :
-fi
-if [ -d /root/.config/xfe ]; then
-    cp -a /root/.config/xfe "$HOME_DIR/.config/" 2>/dev/null || :
-fi
-if [ -f /root/.Xdefaults ]; then
-    cp -a /root/.Xdefaults "$HOME_DIR/.Xdefaults" 2>/dev/null || :
-fi
-
-# Create default .profile
-cat > "$HOME_DIR/.profile" << EOF
-export SHELL=/bin/sh
-export USER=$NEW_USER
-export HOME=$HOME_DIR
-export PATH=/usr/bin:/bin:/usr/sbin:/sbin
-export DISPLAY=:0
-export ENV=\$HOME/.profile
-EOF
-
-# Set ownership and permissions
 chown -R "$NEXT_UID:$USER_GID" "$HOME_DIR"
-chmod 0750 "$HOME_DIR"
+chmod 0700 "$HOME_DIR"
 
-echo "FreeLinX: User '$NEW_USER' created (UID: $NEXT_UID, GID: $USER_GID)."
-echo "Groups: $(id -Gn "$NEW_USER" 2>/dev/null || echo "wheel, video, audio, storage, input, users")"
+echo "FreeLinX: user '$NEW_USER' created (uid $NEXT_UID, gid $USER_GID)."
+echo "Groups: $(id -Gn "$NEW_USER" 2>/dev/null || echo "$_groups")"
 
-# Prompt to set password
-if command -v passwd >/dev/null 2>&1; then
-    echo "Setting password for '$NEW_USER':"
-    passwd "$NEW_USER" || echo "Note: Password can be set later with 'passwd $NEW_USER'."
-fi
+echo "Setting the password for '$NEW_USER':"
+/usr/bin/passwd "$NEW_USER" ||
+    echo "The account is locked until a password is set: passwd $NEW_USER" >&2

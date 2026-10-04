@@ -117,6 +117,32 @@ echo ">>> Boot loader..."
 L=/usr/share/limine
 [ -f "$L/BOOTX64.EFI" ] && { cp "$L/BOOTX64.EFI" "$MP/EFI/BOOT/BOOTX64.EFI"; cp "$L/BOOTX64.EFI" "$MP/BOOTX64.EFI"; }
 [ -f "$L/limine-bios.sys" ] && { cp "$L/limine-bios.sys" "$MP/boot/limine-bios.sys"; cp "$L/limine-bios.sys" "$MP/limine-bios.sys"; }
+# The BIOS stage in the disk's first sector and limine-bios.sys are two halves
+# of one Limine and have to be the same version.  Copying the new .sys over an
+# MBR written by an older Limine (1.0.13 installed 11.4.1; 1.0.14 and later ship
+# 12.9.0) leaves a disk that no longer boots on BIOS, so the stage is written
+# again with the limine this image carries.  UEFI needs only BOOTX64.EFI.
+BIOS_DISK=
+_p=${BOOT_DEV##*/}
+if [ -e "/sys/class/block/$_p/partition" ]; then
+    # The partition's sysfs directory sits inside its disk's.  cd -P + pwd -P
+    # rather than readlink -f, which this userland's readlink does not resolve
+    # through a trailing "..".
+    _d=$(cd -P "/sys/class/block/$_p/.." 2>/dev/null && pwd -P)
+    [ -n "$_d" ] && [ -b "/dev/${_d##*/}" ] && BIOS_DISK=/dev/${_d##*/}
+fi
+if [ -n "$BIOS_DISK" ] && command -v limine >/dev/null 2>&1 && command -v flxpart >/dev/null 2>&1; then
+    bios_i=$(flxpart --show "$BIOS_DISK" 2>/dev/null |
+        sed -n 's/^ *\([0-9][0-9]*\): .*48616821-4964-6F6E-744E-656564454649 *$/\1/p' | head -1)
+    if [ -n "$bios_i" ]; then
+        limine bios-install "$BIOS_DISK" "$bios_i" >/dev/null 2>&1 ||
+            echo "flxupgrade: warning: limine bios-install failed on $BIOS_DISK; the disk may now boot on UEFI only" >&2
+    else
+        echo "flxupgrade: warning: no BIOS boot partition on $BIOS_DISK; it boots on UEFI only" >&2
+    fi
+else
+    echo "flxupgrade: warning: could not rewrite the BIOS boot stage; the disk may boot on UEFI only" >&2
+fi
 for c in "$MP/limine.conf" "$MP/boot/limine.conf" "$MP/EFI/BOOT/limine.conf"; do
     [ -f "$c" ] || continue
     sed -e "s#^interface_branding: FreeLinX.*#interface_branding: FreeLinX $NEW#" \

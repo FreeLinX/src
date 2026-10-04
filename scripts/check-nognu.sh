@@ -69,6 +69,10 @@ fi
 
 # Shared libraries that mean a glibc or GCC build.  musl exposes libc.so and
 # ld-musl-*.so.1, neither of which is here.
+# GNU code linked in statically leaves no DT_NEEDED and, built by clang, no
+# GCC marker; it is found by its own strings (ncurses' NCURSES_NO_PADDING,
+# "GNU Readline", a gnu.org help address, ...).
+GNU_SIGS='NCURSES_NO_PADDING|ncurses 6\.[0-9]|GNU Readline|readline-[0-9]\.[0-9]|GNU gettext|GNU libiconv|Libgcrypt [0-9]|libgpg-error [0-9]|GNU Wget|GNU bash, version|GNU coreutils|GNU Make [0-9]|GNU MP |GNU MPFR|GnuTLS [0-9]|GNU libunistring|GNU nano [0-9]|GNU tar [0-9]|GNU findutils|GNU diffutils|GNU Awk|gnu\.org/gethelp|home page: <https?://www\.gnu\.org/software/'
 GNU_LIB_RE='Shared library: \[(libc\.so\.6|libm\.so\.6|libpthread\.so\.0|libdl\.so\.2|librt\.so\.1|libutil\.so\.1|libresolv\.so\.2|libcrypt\.so\.1|libnsl\.so\.1|libstdc\+\+\.so\.6|libgcc_s\.so\.1|libatomic\.so\.1|libanl\.so\.1|libBrokenLocale\.so\.1)\]'
 
 list=$(mktemp)
@@ -76,15 +80,17 @@ findings=$(mktemp)
 dump=$(mktemp)
 trap 'rm -f "$list" "$findings" "$dump"' EXIT
 
-# NUL separated so names with spaces or newlines survive the read.
-find "$ROOT" -type f -print0 >"$list" 2>/dev/null || :
+# One name per line.  This used to be find -print0 read back with read -d '',
+# which is bash: under sh the read failed at once, the loop never ran, and the
+# check reported "no GNU contamination in 0 ELF files" for any tree at all.
+find "$ROOT" -type f >"$list" 2>/dev/null || :
 
 n_elf=0
 
 # Redirection from a file rather than a pipe keeps this loop in the current
 # shell, so the counters survive.  Piping into while would run it in a
 # subshell and silently zero everything.
-while IFS= read -r -d '' f; do
+while IFS= read -r f; do
 	# One readelf pass per file covers every check: -h to prove it is ELF at
 	# all, -d for DT_NEEDED, -l for the interpreter, -p .comment for the
 	# compiler markers.
@@ -133,6 +139,15 @@ while IFS= read -r -d '' f; do
 		else
 			reasons="$reasons; built by $ver"
 		fi
+	fi
+
+	gnulibs=$(grep -oE 'Shared library: \[lib(ncurses|tinfo|form|menu|panel)w?\.so[^]]*\]|Shared library: \[lib(readline|history|intl|iconv|gmp|mpfr|gcrypt|gpg-error|gnutls|unistring|idn2?)\.so[^]]*\]' "$dump" |
+		sed 's/.*\[//; s/\]//' | sort -u | tr '\n' ' ')
+	if [ -n "$gnulibs" ]; then
+		reasons="$reasons; needs $gnulibs (a GNU library)"
+	fi
+	if LC_ALL=C grep -aqE "$GNU_SIGS" "$f" 2>/dev/null; then
+		reasons="$reasons; GNU code linked in ($(LC_ALL=C grep -aoE "$GNU_SIGS" "$f" | head -1))"
 	fi
 
 	[ -n "$reasons" ] || continue

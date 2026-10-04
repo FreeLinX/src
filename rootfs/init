@@ -262,7 +262,7 @@ if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
     # The medium, read-only: this filesystem is the boot chain, and nothing on
     # a running system has a reason to write to it.
     if ! grep -qs ' /media/flx ' /proc/mounts; then
-        set -- $(flx_find LABEL FREELINUX_MEDIUM)
+        set -- $(flx_find LABEL FREELINX_LIVE)
         if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
             mkdir -p /media/flx
             mount -t "$2" -o "ro,noatime,nodev,nosuid" "$1" /media/flx 2>/dev/null ||
@@ -270,85 +270,6 @@ if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
         fi
     fi
 fi
-
-# --- Input devices (evdev) ---------------------------------------------------
-# Map keyboards and mouse/tablet evdev nodes to /dev/fl-kbd and /dev/fl-pointer
-# for Xorg evdev driver.
-rm -f /dev/fl-kbd /dev/fl-pointer
-NAME=""
-FOUND_TABLET=""
-FOUND_MOUSE=""
-FOUND_KBD=""
-if [ -r /proc/bus/input/devices ]; then
-    while IFS= read -r line; do
-        case "$line" in
-            I:*)
-                NAME=""
-                ;;
-            N:\ Name=\"*)
-                NAME="${line#N: Name=\"}"
-                NAME="${NAME%\"}"
-                ;;
-            H:\ Handlers=*)
-                for h in ${line#H: Handlers=}; do
-                    case "$h" in
-                        event*)
-                            case "$NAME" in
-                                *[Kk]eyboard*)
-                                    [ -z "$FOUND_KBD" ] && FOUND_KBD="/dev/input/$h"
-                                    ;;
-                                *[Tt]ablet*)
-                                    FOUND_TABLET="/dev/input/$h"
-                                    ;;
-                                *[Mm]ouse*|*[Ee]xplorer*|*[Tt]ouchpad*)
-                                    [ -z "$FOUND_MOUSE" ] && FOUND_MOUSE="/dev/input/$h"
-                                    ;;
-                            esac
-                            ;;
-                    esac
-                done
-                ;;
-        esac
-    done < /proc/bus/input/devices
-fi
-
-if [ -n "$FOUND_KBD" ]; then
-    ln -sf "$FOUND_KBD" /dev/fl-kbd
-fi
-if [ -n "$FOUND_TABLET" ] && [ -n "$FOUND_MOUSE" ]; then
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
-elif [ -n "$FOUND_TABLET" ]; then
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer2
-elif [ -n "$FOUND_MOUSE" ]; then
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
-fi
-
-if [ ! -e /dev/fl-kbd ]; then
-    for ev in /dev/input/event*; do
-        [ -e "$ev" ] || continue
-        ln -sf "$ev" /dev/fl-kbd
-        break
-    done
-fi
-if [ ! -e /dev/fl-pointer ]; then
-    for ev in /dev/input/event*; do
-        [ -e "$ev" ] || continue
-        if [ "$ev" != "$(readlink /dev/fl-kbd 2>/dev/null)" ]; then
-            ln -sf "$ev" /dev/fl-pointer
-            break
-        fi
-    done
-fi
-if [ ! -e /dev/fl-pointer2 ] && [ -e /dev/fl-pointer ]; then
-    ln -sf "$(readlink /dev/fl-pointer)" /dev/fl-pointer2
-fi
-
-# --- XKB defaults (kept for GTK apps / X clients; the X server itself is
-# configured through xorg.conf, so do NOT export these before X starts) ------
-# XKB_DEFAULT_RULES/MODEL/LAYOUT are intentionally used by applications only.
 
 # --- Networking -------------------------------------------------------------
 /sbin/ifconfig lo 127.0.0.1 up 2>/dev/null || /sbin/flxifconfig lo up 2>/dev/null || :
@@ -362,7 +283,7 @@ if [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi qemu /sys/class/dmi/id/sys_ve
     /sbin/flxifconfig eth0 inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
     /sbin/flxifconfig eth0 up 2>/dev/null || :
     /sbin/flxroute add default 10.0.2.2 2>/dev/null || /sbin/route add default gw 10.0.2.2 2>/dev/null || :
-    printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+    printf "nameserver 10.0.2.3\n" > /etc/resolv.conf
 fi
 /sbin/dhcpcd -q -b eth0 2>/dev/null || :
 

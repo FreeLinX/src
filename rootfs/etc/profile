@@ -8,21 +8,14 @@ SHELL=/bin/sh
 export SHELL
 export SVDIR=/var/service
 
-# TERM follows the terminal, not the other way round.
-#
-# This file used to set TERM=xterm-256color outright, on every console.  That is
-# right on a virtual terminal and wrong on the serial line: the terminfo entry
-# for xterm-256color describes a 256-column screen, and a serial console at
-# 80x24 either finds no entry that fits or gets the wrong cursor addressing, so
-# every curses program that opens the screen - vim, nnn, htop, less - renders
-# wrong on a system that is otherwise fine.  The only thing that knows the answer
-# is the terminal this shell was started on, and tty(1) resolves to it.
-#
-# An inherited TERM is left alone, so ssh, su and the xorg service keep the one
-# their caller chose.
+# TERM follows the terminal, not the other way round, and only when nothing
+# set it already (getty, ssh and su pass the one their caller chose).  The
+# Linux virtual terminal is "linux"; a serial line is a plain VT100, whose size
+# and features curses programs then ask for rather than assume.
 case $(tty 2>/dev/null) in
-/dev/tty[0-9]*) _FLX_TERM=xterm-256color ;;
-*) _FLX_TERM=linux ;;
+/dev/tty[0-9]*) _FLX_TERM=linux ;;
+/dev/ttyS[0-9]*|/dev/ttyUSB[0-9]*|/dev/ttyAMA[0-9]*) _FLX_TERM=vt100 ;;
+*) _FLX_TERM=xterm-256color ;;
 esac
 export TERM=${TERM:-$_FLX_TERM}
 unset _FLX_TERM
@@ -35,13 +28,13 @@ if [ "$_UID" -eq 0 ]; then
     export USER=root
     export LOGNAME=root
     export HOME=/root
-    export PS1="root@$HOSTNAME:~# "
+    export PS1='root@$HOSTNAME:$PWD# '
 else
     _UNAME=$(id -un 2>/dev/null || whoami 2>/dev/null || echo user)
     export USER="$_UNAME"
     export LOGNAME="$_UNAME"
     export HOME="/home/$_UNAME"
-    export PS1="$_UNAME@$HOSTNAME:~$ "
+    export PS1="$_UNAME@$HOSTNAME:"'$PWD$ '
 fi
 unset _UID _UNAME
 

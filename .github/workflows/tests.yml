@@ -1,0 +1,21 @@
+# The rootfs's own checks: the console service, the device rules, the no-GNU
+# gate on every ELF file, and shellcheck on the scripts that boot the system.
+name: tests
+on: [push, pull_request]
+jobs:
+  rootfs:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+      - name: shellcheck
+        run: shellcheck -s sh -S error rootfs/init rootfs/sbin/flxadduser rootfs/sbin/flxautomount rootfs/sbin/flxconsole rootfs/sbin/flxdriverhotplug rootfs/sbin/flxinstall rootfs/sbin/flx-shutdown rootfs/sbin/flxupgrade rootfs/sbin/flxwifi rootfs/sbin/poweroff rootfs/sbin/reboot rootfs/usr/bin/passwd rootfs/usr/bin/flxnet rootfs/usr/bin/flxtz rootfs/usr/bin/zzz  scripts/check-nognu.sh scripts/test-*.sh
+      - name: check-nognu
+        run: sh scripts/check-nognu.sh rootfs
+      - name: test-console
+        run: PATH=$PATH:/usr/sbin:/sbin sh scripts/test-console.sh
+      - name: test-flxconsole
+        run: PATH=$PATH:/usr/sbin:/sbin sh scripts/test-flxconsole.sh
+      - name: test-mdevconf
+        run: PATH=$PATH:/usr/sbin:/sbin sh scripts/test-mdevconf.sh
