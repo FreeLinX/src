@@ -104,10 +104,13 @@ fi
 #
 # which is indistinguishable from a partition that does not exist, so a scan
 # that does not wait silently gives up on a disk that is perfectly fine.  The
-# wait is on the node, not on the label: a node that is present but carries the
-# wrong label is a real answer and ends the loop immediately.
-flx_find_by_label() {
-    _want=$1
+# wait is on the node, not on the key being matched: a node that is present
+# but carries the wrong UUID or label is a real answer and ends the loop at
+# once.  One function serves both because they differ only in which blkid
+# field is read, and a scan per field would be two copies of this loop.
+flx_find() {
+    _key=$1
+    _want=$2
     _dev=
     _tries=0
     while [ "$_tries" -lt 50 ]; do
@@ -117,8 +120,8 @@ flx_find_by_label() {
             _node="/dev/$_name"
             [ -b "$_node" ] || continue
             _out=$(blkid "$_node" 2>/dev/null || true)
-            _label=$(echo "$_out" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
-            if [ "$_label" = "$_want" ]; then
+            _got=$(echo "$_out" | grep -o "$_key=\"[^\"]*\"" | cut -d'"' -f2 || true)
+            if [ "$_got" = "$_want" ]; then
                 _dev=$_node
                 break
             fi
@@ -133,36 +136,92 @@ flx_find_by_label() {
     fi
 }
 
+# setup-disk records the UUIDs of the two ext4 partitions it made in
+# /etc/flx-disk, and that file is the only thing that says which disk this
+# system is.  A UUID, not a label: a second disk that happens to carry the
+# label FLX_SYS or FLX_HOME -- a second install, a backup image, a stick
+# someone formatted once -- must never be mounted into a running system.  A
+# label is not unique, and the wrong filesystem mounted is worse than one
+# missing, because nothing would report it.
+flx_pin() {
+    [ -r /etc/flx-disk ] || return 0
+    sed -n "s/^$1=\([0-9A-Fa-f-]*\)\$/\1/p" /etc/flx-disk | head -1
+}
+
 if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
-    # The data filesystem first: see the note above flx_find_by_label.
+    # FLX_SYS first: the persistent system trees.  On an installed system
+    # /usr /etc /var /root /bin /sbin /lib live on it, so everything the
+    # installer configured -- the users, the passwords, the hostname, the
+    # timezone, the services -- is in there rather than in the image.  Without
+    # this the system would come up from the image in RAM on every boot and
+    # forget all of it, which is the one thing setup-disk says it does not do.
+    #
+    # One mount and seven binds, not seven mounts: the seven directories are
+    # one filesystem, and seven copies of it in /proc/mounts would be seven
+    # chances to disagree about what is where.  The staging mount is dropped
+    # afterwards; the binds hold the filesystem open without it.
+    #
+    # It goes first because it is the only mount that must be in place before
+    # anything else runs: the scans below then find /var already mounted and
+    # leave it alone, and the hostname, /etc/resolv.conf and every service come
+    # from the disk rather than from the image.
+    _sys_uuid=$(flx_pin FLX_SYS_UUID)
+    if [ -n "$_sys_uuid" ]; then
+        set -- $(flx_find UUID "$_sys_uuid")
+        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
+            mkdir -p /mnt/flxsys
+            if mount -t "$2" -o noatime "$1" /mnt/flxsys 2>/dev/null; then
+                for _d in usr etc var root bin sbin lib; do
+                    [ -d "/mnt/flxsys/$_d" ] || continue
+                    mount -o bind "/mnt/flxsys/$_d" "/$_d" 2>/dev/null ||
+                        echo "FreeLinX: the system partition has /$_d but it could not be put in place; that tree is in RAM" >&2
+                done
+                umount /mnt/flxsys 2>/dev/null || :
+                rmdir /mnt/flxsys 2>/dev/null || :
+                echo "FreeLinX: FLX_SYS persistent system engaged: /usr /etc /var /root /bin /sbin /lib are on $1, so packages and settings survive a reboot"
+            else
+                echo "FreeLinX: the system partition $1 is pinned as FLX_SYS in /etc/flx-disk but did not mount; this system is running from RAM and nothing will survive a reboot" >&2
+            fi
+        else
+            echo "FreeLinX: no partition carries the FLX_SYS UUID $_sys_uuid that /etc/flx-disk pins; this system is running from RAM and nothing will survive a reboot" >&2
+        fi
+    fi
+
+    # The data filesystem: see the note above flx_find.
     #
     # Not fatal when it is absent.  A machine that was installed with sys or
     # none has no such partition, and that is the normal case, not a failure.
     # Failing to boot because an optional filesystem was not plugged in is worse
     # than the filesystem being missing.
     if ! grep -qs ' /var ' /proc/mounts; then
-        set -- $(flx_find_by_label FREELINX_VAR)
+        set -- $(flx_find LABEL FREELINUX_VAR)
         if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
             mkdir -p /var
             grep -qs ' /var ' /proc/mounts \
-                || mount -t "$2" -o "defaults,noatime" "$1" /var 2>/dev/null \
-                || echo "FreeLinX: the data filesystem $1 is labelled FREELINX_VAR but did not mount at /var; /var is in RAM and nothing will survive a reboot" >&2
+                || mount -t "$2" -o noatime "$1" /var 2>/dev/null \
+                || echo "FreeLinX: the data filesystem $1 is labelled FREELINUX_VAR but did not mount at /var; /var is in RAM and nothing will survive a reboot" >&2
         fi
     fi
 
     if ! grep -qs ' /home ' /proc/mounts; then
-        set -- $(flx_find_by_label FLX_HOME)
+        _home_uuid=$(flx_pin FLX_HOME_UUID)
+        if [ -n "$_home_uuid" ]; then
+            set -- $(flx_find UUID "$_home_uuid")
+        else
+            set -- $(flx_find LABEL FLX_HOME)
+        fi
         if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
             mkdir -p /home
             grep -qs " /home " /proc/mounts \
-                || mount -t "$2" -o "defaults,noatime" "$1" /home 2>/dev/null
+                || mount -t "$2" -o noatime "$1" /home 2>/dev/null \
+                || echo "FreeLinX: the home filesystem $1 is pinned as FLX_HOME but did not mount at /home" >&2
         fi
     fi
 
     # The medium, read-only: this filesystem is the boot chain, and nothing on
     # a running system has a reason to write to it.
     if ! grep -qs ' /media/flx ' /proc/mounts; then
-        set -- $(flx_find_by_label FREELINX_MEDIUM)
+        set -- $(flx_find LABEL FREELINUX_MEDIUM)
         if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
             mkdir -p /media/flx
             mount -t "$2" -o "ro,noatime,nodev,nosuid" "$1" /media/flx 2>/dev/null ||
