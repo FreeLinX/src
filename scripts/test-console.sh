@@ -212,10 +212,16 @@ then
 	# device inside.  Only /dev/null is opened: TTYS names nothing else.
 	# --rbind and not --bind: /dev carries submounts, and a non-recursive
 	# bind of a tree with submounts is refused.
-	unshare -r -m sh -c "mount --rbind /dev '$CROOT/dev' &&
+	# flxconsole stays up for good once its consoles are open (runsv is not
+	# meant to restart it), so it is given a few seconds and then TERM, which
+	# is what runsv sends.  124 is timeout's "it was still running".
+	timeout -s TERM 8 unshare -r -m sh -c "mount --rbind /dev '$CROOT/dev' &&
 		exec chroot '$CROOT' /usr/bin/sh /sbin/flxconsole" \
 		>"$TMP/flx.out" 2>"$TMP/flx.err"
 	rc=$?
+	[ "$rc" -eq 124 ] && rc=0
+	# the shell's own note that the TERM above arrived, not flxconsole's output
+	sed -i '/^Terminated$/d' "$TMP/flx.err"
 	if [ "$rc" -ne 0 ]; then
 		no "flxconsole could not be run, so nothing was checked"
 		printf '       rc=%s, stderr: %s\n' "$rc" "$(cat "$TMP/flx.err")"
