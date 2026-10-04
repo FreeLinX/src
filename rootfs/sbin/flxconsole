@@ -72,19 +72,40 @@ fi
 #
 # So: /etc/flx-installed decides.  It exists only once setup-disk has run.
 #
-# util-linux's getty and login where the image has them, toybox's applets where
-# it does not - the tree does not symlink applets onto PATH, because a NetBSD
-# command of the same name is a different program.
+# getty's -l takes one program path, not a command with an argument.  busybox's
+# getty execs the string exactly as it stands, so naming the applet as two
+# words fails with
+#
+#     getty: exec /bin/toybox login: No such file or directory
+#
+# and every console on an installed system gets that line instead of a login,
+# which looks exactly like a password nobody has.  So the login program is named
+# by its path and never as "toybox login".
+#
+# getty is different: how it is *run* is this script's business, so
+# "/bin/toybox getty" is fine there.
+#
+# The tree does not symlink applets onto PATH, because a NetBSD command of the
+# same name is a different program.  login is the one name that exception does
+# not apply to: no port builds one, so /bin/login cannot be anything else, and
+# without a path to name, there is no login to start.
 GETTY=
-LOGINPROG=
-if [ -x /usr/bin/getty ]; then
-	GETTY=/usr/bin/getty
-	[ -x /usr/libexec/toybox/login ] && LOGINPROG=/usr/libexec/toybox/login
-	[ -x /bin/login ] && LOGINPROG=/bin/login
-elif [ -x /bin/toybox ]; then
+for t in /usr/bin/getty /bin/getty; do
+	if [ -x "$t" ]; then
+		GETTY=$t
+		break
+	fi
+done
+if [ -z "$GETTY" ] && [ -x /bin/toybox ]; then
 	GETTY='/bin/toybox getty'
-	LOGINPROG='/bin/toybox login'
 fi
+LOGINPROG=
+for l in /usr/bin/login /bin/login; do
+	if [ -x "$l" ]; then
+		LOGINPROG=$l
+		break
+	fi
+done
 
 export TERM=${TERM:-linux}
 export SHELL=$LOGIN_SHELL
@@ -178,11 +199,6 @@ open_console() {
 		started=yes
 		return 0
 	fi
-	# cd /root: runsvdir starts a service in the service directory, so a shell
-	# started from here opens in /var/service/shell.  Both services that
-	# flxconsole replaced did this before starting their shell, and losing it
-	# with them is why the prompt used to appear in the wrong place.
-	cd /root 2>/dev/null || cd /
 	# cd /root: runsvdir starts a service in the service directory, so a shell
 	# started from here opens in /var/service/shell.  Both services that
 	# flxconsole replaced did this before starting their shell, and losing it

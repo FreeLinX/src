@@ -236,10 +236,11 @@ then
 else
 	printf '  (no unshare -r -m: cannot run flxconsole, skipping)\n'
 fi
-# Nothing else on this system shows /etc/motd: there is no getty and no login in
-# base, so a banner flxconsole does not write is a banner nobody sees.  The tty
-# above is /dev/null, so what it received cannot be read back; which file is
-# sent there is all that can be asked here.
+# Nothing else on this system shows /etc/motd: an installed system shows it at a
+# login prompt, and a live medium has only flxconsole, so a banner flxconsole
+# does not write is a banner nobody sees.  The tty above is /dev/null, so what it
+# received cannot be read back; which file is sent there is all that can be asked
+# here.
 #
 # The name is not what is looked for.  /etc/motd is named in the comments above
 # the code that uses it, so grepping for the string proves nothing - an earlier
@@ -278,6 +279,33 @@ if [ -n "$_cl" ] && [ -n "$_ba" ] && [ "$_cl" -lt "$_ba" ]; then
 	ok 'the clear comes before the banner, so the banner survives'
 else
 	no 'the clear does not come before the banner'
+fi
+
+# An installed system must ask for a login, and the login must be a program
+# getty can exec.  busybox's getty -l execs the string it was given, so
+# "/bin/toybox login" fails with
+#
+#     getty: exec /bin/toybox login: No such file or directory
+#
+# on every console of every installed system, which from the keyboard looks
+# exactly like a password that nobody has.  So the login program is named by a
+# path, and the path has to exist in this tree.
+if sed -n 's/^[[:space:]]*LOGINPROG=//p' "$ROOTFS/sbin/flxconsole" | grep -q ' '; then
+	no 'flxconsole gives LOGINPROG more than one word, which getty -l cannot exec'
+else
+	ok 'flxconsole gives getty a login program that is one path'
+fi
+# the candidates, read off the line that holds them rather than out of the prose
+# around it: a path named in a comment proves nothing about what is looked for
+_login_paths=$(sed -n 's/^for l in \(.*\); do$/\1/p' "$ROOTFS/sbin/flxconsole")
+_login_found=
+for _l in $_login_paths; do
+	[ -x "$ROOTFS$_l" ] && _login_found=$_l
+done
+if [ -n "$_login_found" ]; then
+	ok "flxconsole can start a login: $_login_found is on the image"
+else
+	no "flxconsole looks for a login program and none of [$_login_paths] is on the image, so an installed system cannot ask anyone to log in"
 fi
 
 # A shell in a runit service has no controlling terminal.  It says so on every
