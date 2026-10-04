@@ -22,19 +22,13 @@ export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
 
 umask 022
 
-# --- /var/log -----------------------------------------------------------------
-# A runit service has nowhere to write but /dev/console otherwise, and
-# /dev/console is the terminal the operator is typing on.  ntpd -d logs to
-# stderr, dbus prints its bus address to stdout, and both of those landed on
-# the keyboard.  /var is on the initramfs here and on FLX_VAR or tmpfs once
-# installed, so this is a directory that has to exist at every boot.
-mkdir -p /var/log
-chmod 755 /var/log
-
 # --- pseudo filesystems -----------------------------------------------------
 mount -t proc     proc     /proc 2>/dev/null || :
 mount -t sysfs    sysfs    /sys   2>/dev/null || :
 mount -t devtmpfs devtmpfs /dev   2>/dev/null || :
+# /run first: on an installed system / is still read-only here, so nothing may
+# be created outside the filesystems this block mounts.
+mount -t tmpfs    tmpfs    /run   2>/dev/null || :
 mkdir -p /dev/pts /run/user /dev/shm
 mount -t devpts -o gid=5,mode=0620,ptmxmode=0666 devpts /dev/pts 2>/dev/null || :
 rm -f /dev/ptmx && ln -s /dev/pts/ptmx /dev/ptmx
@@ -53,7 +47,58 @@ for _fd in stdin stdout stderr; do
 	[ -e "/dev/$_fd" ] || ln -s "/proc/self/fd/$_fd" "/dev/$_fd"
 done
 unset _fd
-mount -t tmpfs    tmpfs    /run   2>/dev/null || :
+
+# --- the root filesystem ---------------------------------------------------------
+# An installed system boots the way other systems do: the boot loader passes
+# root=PARTUUID=... ro, the kernel mounts that partition read-only and runs this
+# file from it as pid 1, and this checks the filesystem and remounts it
+# read-write before anything writes to it.  On the live medium the root is the
+# initramfs the kernel unpacked into RAM, and there is nothing to check.
+ON_DISK=no
+case $(awk '$2 == "/" { t = $3 } END { print t }' /proc/mounts) in
+rootfs|ramfs|tmpfs|'') ;;
+*) ON_DISK=yes ;;
+esac
+if [ "$ON_DISK" = yes ]; then
+    # The kernel calls it /dev/root; the real node comes from its major:minor.
+    _mm=$(awk '$5 == "/" { print $3; exit }' /proc/self/mountinfo)
+    _rn=$(sed -n 's/^DEVNAME=//p' "/sys/dev/block/$_mm/uevent" 2>/dev/null)
+    ROOT_DEV=${_rn:+/dev/$_rn}
+    if [ -n "$ROOT_DEV" ] && [ -b "$ROOT_DEV" ] && [ -x /sbin/e2fsck ]; then
+        # -p repairs what is safe to repair unattended.  1 means it did, 2
+        # means the root filesystem was changed under the running kernel and
+        # the machine has to restart; 4 and up need a person.
+        _rc=0
+        /sbin/e2fsck -p "$ROOT_DEV" || _rc=$?
+        if [ "$_rc" -ge 4 ]; then
+            echo "FreeLinX: the root filesystem $ROOT_DEV has errors e2fsck -p will not fix." >&2
+            echo "FreeLinX: run  e2fsck $ROOT_DEV  in this shell, then reboot." >&2
+            exec /bin/sh
+        elif [ "$_rc" -ge 2 ]; then
+            echo "FreeLinX: e2fsck repaired the root filesystem; restarting." >&2
+            sync
+            echo b > /proc/sysrq-trigger
+        fi
+    fi
+    # this mount(8) wants the device and the mount point both
+    mount -o remount,rw "${ROOT_DEV:-/dev/root}" / 2>/dev/null ||
+        mount -t ext4 -o remount,rw "${ROOT_DEV:-/dev/root}" / || {
+        echo "FreeLinX: the root filesystem would not mount read-write; starting a shell." >&2
+        exec /bin/sh
+    }
+    # /tmp in RAM, as on most systems: emptied by every boot, never filling
+    # the root partition.
+    mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp 2>/dev/null || :
+fi
+
+# --- /var/log -----------------------------------------------------------------
+# A runit service has nowhere to write but /dev/console otherwise, and
+# /dev/console is the terminal the operator is typing on.  ntpd -d logs to
+# stderr, dbus prints its bus address to stdout, and both of those landed on
+# the keyboard.  /var is on the initramfs here and on FLX_VAR or tmpfs once
+# installed, so this is a directory that has to exist at every boot.
+mkdir -p /var/log
+chmod 755 /var/log
 
 # --- Device Manager (mdevd) & Driver Auto-Probe ------------------------------
 #
@@ -153,81 +198,6 @@ flx_pin() {
 }
 
 if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
-    # FLX_SYS first: the persistent system trees.  On an installed system
-    # /usr /etc /var /root /bin /sbin /lib live on it, so everything the
-    # installer configured -- the users, the passwords, the hostname, the
-    # timezone, the services -- is in there rather than in the image.  Without
-    # this the system would come up from the image in RAM on every boot and
-    # forget all of it, which is the one thing setup-disk says it does not do.
-    #
-    # One mount and seven binds, not seven mounts: the seven directories are
-    # one filesystem, and seven copies of it in /proc/mounts would be seven
-    # chances to disagree about what is where.  The staging mount is dropped
-    # afterwards; the binds hold the filesystem open without it.
-    #
-    # It goes first because it is the only mount that must be in place before
-    # anything else runs: the scans below then find /var already mounted and
-    # leave it alone, and the hostname, /etc/resolv.conf and every service come
-    # from the disk rather than from the image.
-    _sys_uuid=$(flx_pin FLX_SYS_UUID)
-    if [ -n "$_sys_uuid" ]; then
-        set -- $(flx_find UUID "$_sys_uuid")
-        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
-            mkdir -p /mnt/flx_sys
-            if mount -t "$2" -o noatime "$1" /mnt/flx_sys 2>/dev/null; then
-                # A newer image on the boot partition than the one this
-                # filesystem was written by.  setup-disk records the version it
-                # left behind in .flx-image-version, and flxupgrade puts a newer
-                # kernel and image next to it, so a system that boots the new
-                # release must not go on running the old userland out of the
-                # filesystem the installer copied.
-                #
-                # /usr /bin /sbin /lib are replaced wholesale, because that is
-                # what the release means by a new version.  /etc is not: the
-                # user's settings, their users and their hostname are theirs,
-                # and only files the new image has and this one lacks are added,
-                # so a setting made since the install survives.  A package
-                # installed with xpkg into /usr also survives, because this
-                # copies the image over it instead of emptying the directory
-                # first.
-                _img=$(sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/os-release 2>/dev/null)
-                _sys=$(cat /mnt/flx_sys/.flx-image-version 2>/dev/null)
-                if [ -n "$_img" ] && [ "$_img" != "$_sys" ] && [ -d /mnt/flx_sys/usr ]; then
-                    echo "FreeLinX: the system partition was written by ${_sys:-an earlier release} and this is $_img; bringing the system files up to date, this takes a minute..." >&2
-                    for _d in usr bin sbin lib; do
-                        mkdir -p "/mnt/flx_sys/$_d"
-                        (cd / && tar cf - "$_d" 2>/dev/null) | (cd /mnt/flx_sys && tar xpf - 2>/dev/null) || :
-                    done
-                    (cd /etc && find . \( -type f -o -type l \) -print) 2>/dev/null | while IFS= read -r _f; do
-                        [ -e "/mnt/flx_sys/etc/$_f" ] || [ -L "/mnt/flx_sys/etc/$_f" ] && continue
-                        mkdir -p "/mnt/flx_sys/etc/$(dirname "$_f")"
-                        cp -a "/etc/$_f" "/mnt/flx_sys/etc/$_f" 2>/dev/null || :
-                    done
-                    # the release's identity is FreeLinX's, not the user's
-                    cp -a /etc/os-release /mnt/flx_sys/etc/os-release 2>/dev/null || :
-                    for _x in /mnt/flx_sys/etc/issue /mnt/flx_sys/etc/motd; do
-                        [ -f "$_x" ] && sed -i "s/ FreeLinX [0-9][0-9.]*/ FreeLinX $_img/" "$_x"
-                    done
-                    printf '%s\n' "$_img" > /mnt/flx_sys/.flx-image-version
-                    sync
-                    echo "FreeLinX: the system partition is now $_img" >&2
-                fi
-                for _d in usr etc var root bin sbin lib; do
-                    [ -d "/mnt/flx_sys/$_d" ] || continue
-                    mount -o bind "/mnt/flx_sys/$_d" "/$_d" 2>/dev/null ||
-                        echo "FreeLinX: the system partition has /$_d but it could not be put in place; that tree is in RAM" >&2
-                done
-                umount /mnt/flx_sys 2>/dev/null || :
-                rmdir /mnt/flx_sys 2>/dev/null || :
-                echo "FreeLinX: FLX_SYS persistent system engaged: /usr /etc /var /root /bin /sbin /lib are on $1, so packages and settings survive a reboot"
-            else
-                echo "FreeLinX: the system partition $1 is pinned as FLX_SYS in /etc/flx-disk but did not mount; this system is running from RAM and nothing will survive a reboot" >&2
-            fi
-        else
-            echo "FreeLinX: no partition carries the FLX_SYS UUID $_sys_uuid that /etc/flx-disk pins; this system is running from RAM and nothing will survive a reboot" >&2
-        fi
-    fi
-
     # The data filesystem: see the note above flx_find.
     #
     # Not fatal when it is absent.  A machine that was installed with sys or
@@ -293,6 +263,16 @@ if [ -r /etc/hostname ]; then
     _hostname=$(cat /etc/hostname 2>/dev/null | tr -d '[:space:]')
 fi
 [ -n "$_hostname" ] && hostname "$_hostname"
+
+# --- rescue -------------------------------------------------------------------
+# "Rescue shell" in the boot menu passes flx.rescue=1: everything above is up
+# (filesystems, devices), no service is started, and the console is a root shell.
+case " $(cat /proc/cmdline 2>/dev/null) " in
+*" flx.rescue=1 "*)
+    echo "FreeLinX: rescue shell (no services started).  exit or reboot when done." >&2
+    exec /bin/sh -l </dev/console >/dev/console 2>&1
+    ;;
+esac
 
 # --- runit service supervision -----------------------------------------------
 if [ -x /sbin/runsvdir ]; then

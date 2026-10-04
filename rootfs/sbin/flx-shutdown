@@ -26,10 +26,13 @@ kill -TERM -1 2>/dev/null; sleep 1
 kill -KILL -1 2>/dev/null
 sync
 # 2. persistent trees: deepest first; fall back to read-only if busy
-awk '$1 ~ "^/dev/" {print $2}' /proc/mounts | sort -r | while read -r m; do
+awk '$1 ~ "^/dev/" {print $2, $1}' /proc/mounts | sort -r | while read -r m d; do
     case "$m" in /|/proc|/sys|/dev|/dev/*|/run) continue ;; esac
-    umount "$m" 2>/dev/null || mount -o remount,ro "$m" 2>/dev/null || :
+    umount "$m" 2>/dev/null || mount -o remount,ro "$d" "$m" 2>/dev/null || :
 done
+# / last: read-only, so the disk is clean when the power goes (sysrq u below
+# does the same for anything this missed)
+mount -o remount,ro "$(awk '$2 == "/" { print $1 }' /proc/mounts)" / 2>/dev/null || :
 sync
 echo 1 > /proc/sys/kernel/sysrq 2>/dev/null
 echo s > /proc/sysrq-trigger 2>/dev/null

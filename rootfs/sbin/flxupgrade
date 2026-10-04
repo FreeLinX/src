@@ -4,12 +4,18 @@
 #
 #   doas flxupgrade [-y] [disk]
 #
-# Run it from the live ISO of the new release.  It finds the installed
-# system's boot partition (FLX_BOOT) and replaces only the kernel, the
-# system image and the boot menu on it; FLX_SYS (/usr /etc /var ...) and
-# FLX_HOME are left alone.  On the next boot /init sees the newer image and
-# refreshes the system files on FLX_SYS from it, keeping /etc settings and
-# the packages installed with xpkg.
+# Run it from the live ISO of the new release.  It finds the installed system
+# (its FLX_BOOT and root partitions), replaces the system files on the root
+# partition with this release's - /usr /bin /sbin /lib and /init - adds the
+# files in /etc this release has and the installed one lacks, and puts this
+# release's kernel and Limine on the boot partition.  Settings in /etc, users,
+# packages installed with xpkg and /home stay.  Afterwards: doas xpkg upgrade.
+#
+# A system installed by 1.0.13-1.1.x ran from an image in RAM with its trees on
+# a partition labelled FLX_SYS.  That partition already holds /usr /etc /var
+# /root /bin /sbin /lib, so it becomes the root partition: the rest of / is
+# added, it is relabelled FLX_ROOT, and the RAM image on the boot partition is
+# removed.
 #
 # Copyright (c) 2026 FreeLinX OS Project.
 # SPDX-License-Identifier: BSD-2-Clause
@@ -21,7 +27,7 @@ YES=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -y|--yes) YES=1; shift ;;
-        -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) die "unknown option: $1" ;;
         *) break ;;
     esac
@@ -30,136 +36,178 @@ DISK="${1:-}"
 
 [ "$(id -u)" -eq 0 ] || die "run it as root (doas flxupgrade)"
 [ -e /etc/flx-installed ] && die "this is an installed system: boot the new release's live ISO and run flxupgrade there"
-
 NEW=$(sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/os-release)
 
-# the installed system's partitions, by label (optionally on one disk only)
-find_label() { # label
+find_label() { # label - a partition with it, on DISK when one was named
     blkid 2>/dev/null | grep "LABEL=\"$1\"" | cut -d: -f1 | while IFS= read -r d; do
         case "$d" in "$DISK"*) echo "$d" ;; esac
     done | head -1
 }
-BOOT_DEV=$(find_label FLX_BOOT)
-SYS_DEV=$(find_label FLX_SYS)
-[ -n "$BOOT_DEV" ] || die "no installed FreeLinX found (no FLX_BOOT partition${DISK:+ on $DISK})"
-[ -n "$SYS_DEV" ] || die "$BOOT_DEV has no FLX_SYS partition next to it"
+uuid_of() { blkid "$1" 2>/dev/null | grep -o ' UUID="[^"]*"' | cut -d'"' -f2; }
 
-# the kernel and system image this live system booted: on the live medium
-# (the ISO, LABEL=FREELINX_LIVE), as the release ships them
-ISO=/mnt/flx_upgrade_iso
-KERNEL_SRC=""; INITRD_SRC=""
-iso_dev=$(blkid 2>/dev/null | grep 'LABEL="FREELINX_LIVE"' | cut -d: -f1 | head -1)
-if [ -n "$iso_dev" ]; then
-    mkdir -p "$ISO"
-    mount -o ro -t iso9660 "$iso_dev" "$ISO" 2>/dev/null || mount -o ro "$iso_dev" "$ISO" 2>/dev/null || :
-    [ -f "$ISO/boot/bzImage" ] && KERNEL_SRC="$ISO/boot/bzImage"
-    [ -f "$ISO/boot/initramfs.img.gz" ] && INITRD_SRC="$ISO/boot/initramfs.img.gz"
+BOOT_DEV=$(find_label FLX_BOOT)
+[ -n "$BOOT_DEV" ] || die "no installed FreeLinX found (no FLX_BOOT partition${DISK:+ on $DISK})"
+OLDMODEL=no
+ROOT_DEV=$(find_label FLX_ROOT)
+if [ -z "$ROOT_DEV" ]; then
+    ROOT_DEV=$(find_label FLX_SYS)
+    [ -n "$ROOT_DEV" ] && OLDMODEL=yes
 fi
-[ -n "$KERNEL_SRC" ] && [ -n "$INITRD_SRC" ] || die "boot the new release's live ISO (the live medium with its system image was not found)"
+[ -n "$ROOT_DEV" ] || die "$BOOT_DEV has no FLX_ROOT (or FLX_SYS) partition next to it"
+HOME_DEV=$(find_label FLX_HOME)
+
+# The disk, and the BIOS boot partition on it, for Limine's BIOS stage.
+_p=${BOOT_DEV##*/}
+_d=$(cd -P "/sys/class/block/$_p/.." 2>/dev/null && pwd -P)
+DISK_DEV=
+[ -n "$_d" ] && [ -b "/dev/${_d##*/}" ] && DISK_DEV=/dev/${_d##*/}
+[ -n "$DISK_DEV" ] || die "cannot tell which disk $BOOT_DEV is on"
+part_index() { # partition device -> its number
+    cat "/sys/class/block/${1##*/}/partition" 2>/dev/null
+}
+
+# gpt_partuuid DISK INDEX - the GPT unique GUID of a partition (what the
+# kernel's root=PARTUUID= matches); see setup-disk.
+gpt_partuuid() {
+    _ss=$(cat "/sys/class/block/${1##*/}/queue/logical_block_size" 2>/dev/null || echo 512)
+    # shellcheck disable=SC2046
+    set -- "$1" "$2" $(dd if="$1" bs="$_ss" skip=1 count=1 2>/dev/null | od -An -v -tu1 |
+		awk '{ for (i = 1; i <= NF; i++) printf "%d ", $i + 0 }')
+    _disk=$1 _idx=$2
+    shift 2
+    [ "${1:-}" = 69 ] && [ "${2:-}" = 70 ] && [ "${3:-}" = 73 ] || return 1
+    _lba=0 _i=7
+    while [ "$_i" -ge 0 ]; do eval "_b=\${$((73 + _i))}"; _lba=$((_lba * 256 + _b)); _i=$((_i - 1)); done
+    _esz=0 _i=3
+    while [ "$_i" -ge 0 ]; do eval "_b=\${$((85 + _i))}"; _esz=$((_esz * 256 + _b)); _i=$((_i - 1)); done
+    _g=$(dd if="$_disk" bs=1 skip=$((_lba * _ss + (_idx - 1) * _esz + 16)) count=16 2>/dev/null |
+        od -An -v -tx1 | tr -d ' \n')
+    [ "${#_g}" -eq 32 ] || return 1
+    printf '%s\n' "$_g" | awk '{ s = $0
+        printf "%s%s%s%s-%s%s-%s%s-%s-%s\n", substr(s,7,2), substr(s,5,2), substr(s,3,2), substr(s,1,2),
+            substr(s,11,2), substr(s,9,2), substr(s,15,2), substr(s,13,2), substr(s,17,4), substr(s,21,12) }'
+}
+ROOT_PARTUUID=$(gpt_partuuid "$DISK_DEV" "$(part_index "$ROOT_DEV")") ||
+    die "cannot read the partition GUID of $ROOT_DEV"
+
+KERNEL_SRC=
+for k in /boot/vmlinuz /boot/bzImage; do [ -f "$k" ] && KERNEL_SRC=$k && break; done
+[ -n "$KERNEL_SRC" ] || die "this live system has no kernel in /boot to install"
 
 MP=/mnt/flx_upgrade_boot
-SMP=/mnt/flx_upgrade_sys
-mkdir -p "$MP" "$SMP"
+RP=/mnt/flx_upgrade_root
+mkdir -p "$MP" "$RP"
+trap 'umount "$MP" 2>/dev/null || :; umount "$RP" 2>/dev/null || :; rmdir "$MP" "$RP" 2>/dev/null || :' EXIT INT TERM
 mount -t vfat "$BOOT_DEV" "$MP" || die "cannot mount $BOOT_DEV"
-trap 'umount "$MP" 2>/dev/null || :; umount "$SMP" 2>/dev/null || :; umount "$ISO" 2>/dev/null || :; rmdir "$MP" "$SMP" "$ISO" 2>/dev/null || :' EXIT INT TERM
-[ -f "$MP/boot/initramfs.img.gz" ] || die "$BOOT_DEV does not hold a FreeLinX system image"
-mount -t ext4 -o ro "$SYS_DEV" "$SMP" 2>/dev/null || :
-OLD=$(cat "$SMP/.flx-image-version" 2>/dev/null || echo "1.0.x")
-umount "$SMP" 2>/dev/null || :
+e2fsck -p "$ROOT_DEV" >/dev/null 2>&1 || [ $? -le 1 ] || die "$ROOT_DEV has filesystem errors: run e2fsck $ROOT_DEV first"
+mount -t ext4 "$ROOT_DEV" "$RP" || die "cannot mount $ROOT_DEV"
+[ -d "$RP/etc" ] && [ -d "$RP/usr" ] || die "$ROOT_DEV does not hold a FreeLinX system"
+OLD=$(sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$RP/etc/os-release" 2>/dev/null)
 
-need=$(( $(wc -c < "$INITRD_SRC") + $(wc -c < "$KERNEL_SRC") ))
-free=$(df -k "$MP" | awk 'NR == 2 { print $4 * 1024 }')
-have=$(( free + $(wc -c < "$MP/boot/initramfs.img.gz") + $(wc -c < "$MP/boot/bzImage" 2>/dev/null || echo 0) ))
-[ "$have" -gt "$need" ] || die "the boot partition is too small for the new image"
-
-echo "Installed FreeLinX $OLD on $BOOT_DEV / $SYS_DEV -> $NEW"
-echo "Only the boot partition is rewritten; /usr, /etc, /var and /home stay."
+echo "Installed FreeLinX ${OLD:-?} on $ROOT_DEV -> $NEW"
+[ "$OLDMODEL" = yes ] &&
+    echo "It runs from an image in RAM; it will run from $ROOT_DEV, like any installed system."
+echo "System files are replaced; /etc settings, users, packages and /home stay."
 if [ "$YES" != 1 ]; then
     printf "Continue? [y/N] "
     read -r a
     case "$a" in y|Y|yes|YES) ;; *) echo "Nothing was changed."; exit 1 ;; esac
 fi
 
-echo ">>> Kernel and system image..."
-cp "$KERNEL_SRC" "$MP/boot/bzImage.new"
-cp "$INITRD_SRC" "$MP/boot/initramfs.img.gz.new"
-# the installed-system marker, and /etc without the live user (as flxinstall
-# writes them): cpio archives appended after the image
-ov=$(mktemp -d /tmp/flxup.XXXXXX)
-mkdir -p "$ov/etc"
-: > "$ov/etc/flx-installed"
-for f in passwd shadow group doas.conf; do [ -f "/etc/$f" ] && cp -p "/etc/$f" "$ov/etc/"; done
-for f in passwd shadow; do
-    [ -f "$ov/etc/$f" ] && { grep -v '^live:' "$ov/etc/$f" > "$ov/etc/$f.n"; cat "$ov/etc/$f.n" > "$ov/etc/$f"; rm -f "$ov/etc/$f.n"; }
+echo ">>> System files..."
+# /usr /bin /sbin /lib and /init are replaced wholesale - that is what the
+# release means by a new version - by copying over them, so a package
+# installed with xpkg into /usr stays.  /etc is not replaced: only files this
+# release has and the installed system lacks are added.
+for d in usr bin sbin lib; do
+    mkdir -p "$RP/$d"
+    (cd / && tar cf - "$d") | (cd "$RP" && tar xpf -) || die "could not copy /$d"
 done
-if [ -f "$ov/etc/group" ]; then
-    awk -F: 'BEGIN { OFS = ":" } $1 == "live" { next }
-        { n = split($4, m, ","); o = ""
-          for (i = 1; i <= n; i++) if (m[i] != "live" && m[i] != "") o = o (o == "" ? "" : ",") m[i]
-          $4 = o; print }' "$ov/etc/group" > "$ov/etc/group.n" && cat "$ov/etc/group.n" > "$ov/etc/group"
-    rm -f "$ov/etc/group.n"
-fi
-[ -f "$ov/etc/doas.conf" ] && { grep -v 'permit nopass keepenv live$' "$ov/etc/doas.conf" > "$ov/etc/doas.conf.n"; cat "$ov/etc/doas.conf.n" > "$ov/etc/doas.conf"; rm -f "$ov/etc/doas.conf.n"; }
-# pin this system's partitions by UUID (older releases accepted any disk
-# with the FLX_SYS / FLX_HOME label)
-uuid_of() { blkid "$1" 2>/dev/null | grep -o ' UUID="[^"]*"' | cut -d'"' -f2; }
-HOME_DEV=$(find_label FLX_HOME)
-printf 'FLX_SYS_UUID=%s\nFLX_HOME_UUID=%s\n' "$(uuid_of "$SYS_DEV")" "$([ -n "$HOME_DEV" ] && uuid_of "$HOME_DEV")" > "$ov/etc/flx-disk"
-(cd "$ov" && find ./etc -print0 | cpio --null -o --format=newc 2>/dev/null) >> "$MP/boot/initramfs.img.gz.new"
-rm -rf "$ov"
-mv "$MP/boot/bzImage.new" "$MP/boot/bzImage"
-mv "$MP/boot/initramfs.img.gz.new" "$MP/boot/initramfs.img.gz"
-# modules of an xpkg-installed kernel belong to the old one: the image now
-# carries the current kernel's modules
-(cd /tmp && printf '' | cpio -o --format=newc 2>/dev/null) > "$MP/boot/kmods.cpio"
+cp -p /init "$RP/init"
+(cd /etc && find . \( -type f -o -type l \) -print) | while IFS= read -r f; do
+    [ -e "$RP/etc/$f" ] || [ -L "$RP/etc/$f" ] && continue
+    mkdir -p "$RP/etc/$(dirname "$f")"
+    cp -a "/etc/$f" "$RP/etc/$f" 2>/dev/null || :
+done
+# the release's identity is FreeLinX's, not the user's
+cp -p /etc/os-release "$RP/etc/os-release"
+[ -f /etc/flx-base-version ] && cp -p /etc/flx-base-version "$RP/etc/flx-base-version"
+for x in "$RP/etc/issue" "$RP/etc/motd"; do
+    [ -f "$x" ] && sed -i "s/ FreeLinX [0-9][0-9.]*/ FreeLinX $NEW/" "$x"
+done
+mkdir -p "$RP/boot"
+cp "$KERNEL_SRC" "$RP/boot/vmlinuz.new" && mv "$RP/boot/vmlinuz.new" "$RP/boot/vmlinuz"
 
-echo ">>> Boot loader..."
+if [ "$OLDMODEL" = yes ]; then
+    echo ">>> Making $ROOT_DEV the root partition..."
+    # the rest of a root filesystem: mount points, and any top-level directory
+    # this release has that the old seven trees did not
+    for n in proc sys dev run tmp mnt media home; do mkdir -p "$RP/$n"; done
+    chmod 1777 "$RP/tmp"
+    for d in /*; do
+        n=${d#/}
+        case $n in proc|sys|dev|run|tmp|mnt|media|home|lost+found) continue ;; esac
+        [ -e "$RP/$n" ] || [ -L "$RP/$n" ] || (cd / && tar cf - "$n") | (cd "$RP" && tar xpf -)
+    done
+    tune2fs -L FLX_ROOT "$ROOT_DEV" >/dev/null || die "cannot relabel $ROOT_DEV FLX_ROOT"
+    rm -f "$RP/.flx-image-version"
+fi
+: > "$RP/etc/flx-installed"
+ROOT_UUID=$(uuid_of "$ROOT_DEV")
+HOME_UUID=$([ -n "$HOME_DEV" ] && uuid_of "$HOME_DEV" || :)
+printf 'FLX_ROOT_UUID=%s\nFLX_HOME_UUID=%s\n' "$ROOT_UUID" "$HOME_UUID" > "$RP/etc/flx-disk"
+{
+    echo '# Written by flxupgrade.  / is mounted by the kernel (root=PARTUUID= in'
+    echo '# limine.conf) and /home by /init, both by these UUIDs.'
+    printf 'UUID=%s\t/\text4\tdefaults,noatime\t0 1\n' "$ROOT_UUID"
+    [ -n "$HOME_UUID" ] && printf 'UUID=%s\t/home\text4\tdefaults,noatime\t0 2\n' "$HOME_UUID"
+    printf 'tmpfs\t/tmp\ttmpfs\tmode=1777,nosuid,nodev\t0 0\n'
+} > "$RP/etc/fstab"
+sync
+
+echo ">>> Kernel and boot loader..."
+mkdir -p "$MP/boot" "$MP/EFI/BOOT"
+cp "$KERNEL_SRC" "$MP/boot/bzImage.new" && mv "$MP/boot/bzImage.new" "$MP/boot/bzImage"
+# the old RAM image, and its module overlay: nothing boots them any more
+rm -f "$MP/boot/initramfs.img.gz" "$MP/boot/kmods.cpio"
 L=/usr/share/limine
 [ -f "$L/BOOTX64.EFI" ] && { cp "$L/BOOTX64.EFI" "$MP/EFI/BOOT/BOOTX64.EFI"; cp "$L/BOOTX64.EFI" "$MP/BOOTX64.EFI"; }
 [ -f "$L/limine-bios.sys" ] && { cp "$L/limine-bios.sys" "$MP/boot/limine-bios.sys"; cp "$L/limine-bios.sys" "$MP/limine-bios.sys"; }
+CMD="root=PARTUUID=$ROOT_PARTUUID rootfstype=ext4 rootwait ro init=/init console=ttyS0,115200 console=tty0"
+cat > "$MP/limine.conf" <<EOF
+# Written by flxupgrade.
+timeout: 3
+serial: yes
+textmode: yes
+interface_branding: FreeLinX $NEW
+
+/FreeLinX $NEW
+    protocol: linux
+    kernel_path: boot():/boot/bzImage
+    cmdline: $CMD
+
+/Rescue shell
+    protocol: linux
+    kernel_path: boot():/boot/bzImage
+    cmdline: $CMD flx.rescue=1
+EOF
+cp "$MP/limine.conf" "$MP/boot/limine.conf"
+cp "$MP/limine.conf" "$MP/EFI/BOOT/limine.conf"
 # The BIOS stage in the disk's first sector and limine-bios.sys are two halves
-# of one Limine and have to be the same version.  Copying the new .sys over an
-# MBR written by an older Limine (1.0.13 installed 11.4.1; 1.0.14 and later ship
-# 12.9.0) leaves a disk that no longer boots on BIOS, so the stage is written
-# again with the limine this image carries.  UEFI needs only BOOTX64.EFI.
-BIOS_DISK=
-_p=${BOOT_DEV##*/}
-if [ -e "/sys/class/block/$_p/partition" ]; then
-    # The partition's sysfs directory sits inside its disk's.  cd -P + pwd -P
-    # rather than readlink -f, which this userland's readlink does not resolve
-    # through a trailing "..".
-    _d=$(cd -P "/sys/class/block/$_p/.." 2>/dev/null && pwd -P)
-    [ -n "$_d" ] && [ -b "/dev/${_d##*/}" ] && BIOS_DISK=/dev/${_d##*/}
-fi
-if [ -n "$BIOS_DISK" ] && command -v limine >/dev/null 2>&1 && command -v flxpart >/dev/null 2>&1; then
-    bios_i=$(flxpart --show "$BIOS_DISK" 2>/dev/null |
+# of one Limine and have to be the same version, so it is written again.
+if command -v limine >/dev/null 2>&1 && command -v flxpart >/dev/null 2>&1; then
+    bios_i=$(flxpart --show "$DISK_DEV" 2>/dev/null |
         sed -n 's/^ *\([0-9][0-9]*\): .*48616821-4964-6F6E-744E-656564454649 *$/\1/p' | head -1)
     if [ -n "$bios_i" ]; then
-        limine bios-install "$BIOS_DISK" "$bios_i" >/dev/null 2>&1 ||
-            echo "flxupgrade: warning: limine bios-install failed on $BIOS_DISK; the disk may now boot on UEFI only" >&2
+        limine bios-install "$DISK_DEV" "$bios_i" >/dev/null 2>&1 ||
+            echo "flxupgrade: warning: limine bios-install failed on $DISK_DEV; the disk may boot on UEFI only" >&2
     else
-        echo "flxupgrade: warning: no BIOS boot partition on $BIOS_DISK; it boots on UEFI only" >&2
+        echo "flxupgrade: warning: no BIOS boot partition on $DISK_DEV; it boots on UEFI only" >&2
     fi
-else
-    echo "flxupgrade: warning: could not rewrite the BIOS boot stage; the disk may boot on UEFI only" >&2
 fi
-for c in "$MP/limine.conf" "$MP/boot/limine.conf" "$MP/EFI/BOOT/limine.conf"; do
-    [ -f "$c" ] || continue
-    sed -e "s#^interface_branding: FreeLinX.*#interface_branding: FreeLinX $NEW#" \
-        -e "s#^/FreeLinX[0-9. ]*\$#/FreeLinX $NEW#" \
-        -e "s#^/FreeLinX[0-9. ]* (basic graphics)#/FreeLinX $NEW (basic graphics)#" "$c" > "$c.n"
-    # systems from 1.0.0/1.0.1 do not load kmods.cpio yet
-    if ! grep -q kmods.cpio "$c.n"; then
-        sed 's#^\(    module_path: boot():/boot/initramfs.img.gz\)$#\1\
-    module_path: boot():/boot/kmods.cpio#' "$c.n" > "$c.m" && mv "$c.m" "$c.n"
-    fi
-    mv "$c.n" "$c"
-done
 sync
-
 echo ""
-echo "Done: FreeLinX $NEW is on $BOOT_DEV."
-echo "Reboot into the installed system (remove the live medium). Its first"
-echo "boot refreshes the system files, which takes a minute; then run"
+echo "Done: FreeLinX $NEW is installed on $ROOT_DEV."
+echo "Reboot into it (remove the live medium), then run"
 echo "  doas xpkg upgrade"
 echo "to bring the packages up to date."
