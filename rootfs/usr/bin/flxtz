@@ -1,0 +1,30 @@
+#!/bin/sh
+# flxtz - set the FreeLinX time zone (IANA name, e.g. Asia/Baku).
+#   flxtz                interactive list
+#   flxtz Area/City      set directly
+# Writes /etc/TZ (read by the session and /etc/profile) and /etc/localtime,
+# then restarts the panel so its clock follows immediately.
+ZI=/usr/share/zoneinfo
+set_tz() {
+    [ -f "$ZI/$1" ] || { echo "flxtz: unknown zone '$1' (see $ZI)" >&2; return 1; }
+    printf '%s\n' "$1" > /etc/TZ && ln -sf "$ZI/$1" /etc/localtime || {
+        echo "flxtz: cannot write /etc/TZ (run as root: doas flxtz)" >&2; return 1; }
+    export TZ="$1"
+    echo "Time zone: $1  ($(date '+%H:%M %Z'))"
+    if [ -n "${DISPLAY:-}" ] && command -v tint2 >/dev/null 2>&1; then
+        pkill -x tint2 2>/dev/null
+        TZ="$1" tint2 -c /etc/xdg/tint2/tint2rc >/dev/null 2>&1 &
+    fi
+}
+if [ -n "${1:-}" ]; then set_tz "$1"; exit; fi
+ZONES="UTC Asia/Baku Europe/Istanbul Europe/Moscow Asia/Tbilisi Asia/Yerevan Asia/Tehran Asia/Dubai Asia/Tashkent Asia/Almaty Europe/London Europe/Berlin Europe/Paris Europe/Kyiv Asia/Kolkata Asia/Shanghai Asia/Tokyo America/New_York America/Chicago America/Denver America/Los_Angeles America/Sao_Paulo Australia/Sydney"
+echo "Current: $(cat /etc/TZ 2>/dev/null || echo UTC)  ($(date '+%H:%M %Z'))"
+i=1; for z in $ZONES; do printf '%3d) %s\n' "$i" "$z"; i=$((i+1)); done
+printf 'Number, or a zone name (Enter = cancel): '
+read -r ans || exit 0
+[ -n "$ans" ] || exit 0
+case "$ans" in
+    *[!0-9]*) set_tz "$ans" ;;
+    *) set -- $ZONES; [ "$ans" -ge 1 ] && [ "$ans" -le $# ] && { shift $((ans-1)); set_tz "$1"; } || echo "flxtz: no such entry" ;;
+esac
+printf 'Press Enter to close.'; read -r _

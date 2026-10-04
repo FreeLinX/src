@@ -9,6 +9,14 @@
 
 set -e
 
+# While flxinstall is partitioning/formatting/mounting the target disk,
+# mdevd hotplug events fire for the freshly created partitions.  flxinstall
+# creates /run/flxinstall-active so this automounter steps aside and never
+# races the installer (which otherwise ends in "Device or resource busy").
+if [ -e /run/flxinstall-active ]; then
+    exit 0
+fi
+
 MDEV="${MDEV:-$1}"
 ACTION="${ACTION:-add}"
 
@@ -16,12 +24,6 @@ ACTION="${ACTION:-add}"
 
 DEVNODE="/dev/$MDEV"
 MNTPOINT="/media/$MDEV"
-
-# The FreeLinX medium, whether it arrives as a disc or as a USB stick.  Same
-# label and same place as /init mounts it, and read-only for the same reason:
-# that filesystem is the boot chain.
-MEDIUM_LABEL="FREELINX_MEDIUM"
-MEDIUM_MNT="/media/flx"
 
 log_msg() {
     echo "FreeLinX automount: $1" >&2
@@ -51,42 +53,34 @@ case "$ACTION" in
             FS_LABEL=$(echo "$OUT" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
         fi
 
-        # Persistent /home: mount the FLX_HOME partition at /home (not /media)
-        if [ "$FS_LABEL" = "FLX_HOME" ]; then
+        # Persistent system overlay: FLX_SYS is mounted by /init (never here).
+        # FLX_BOOT is the installed system's own EFI partition - not media.
+        if [ "$FS_LABEL" = "FLX_SYS" ] || [ "$FS_LABEL" = "FLX_BOOT" ]; then
+            exit 0
+        fi
+
+        # Persistent /home: the installed system's own FLX_HOME partition
+        # (pinned by UUID in /etc/flx-disk) goes to /home.  On the live
+        # system, or for any other disk that merely carries the label (a USB
+        # stick), it is ordinary removable media below.
+        HOME_PIN=$(sed -n 's/^FLX_HOME_UUID=\([0-9A-Fa-f-]*\)$/\1/p' /etc/flx-disk 2>/dev/null | head -1)
+        FS_UUID=$(echo "$OUT" | grep -o ' UUID="[^"]*"' | cut -d'"' -f2 || true)
+        if [ "$FS_LABEL" = "FLX_HOME" ] && [ -e /etc/flx-installed ] &&
+           { [ -z "$HOME_PIN" ] || [ "$FS_UUID" = "$HOME_PIN" ]; }; then
             mkdir -p /home
             if ! grep -qs ' /home ' /proc/mounts; then
                 # The bundled mount requires an explicit -t (no auto-detect);
                 # fall back to guessing from blkid, then common filesystems.
                 FSTYPE_OPT=""
                 [ -n "$FSTYPE" ] && FSTYPE_OPT="-t $FSTYPE"
-                if mount $FSTYPE_OPT -o defaults,noatime "$DEVNODE" /home 2>/dev/null ||
-                   mount -o defaults,noatime "$DEVNODE" /home 2>/dev/null; then
+                if mount $FSTYPE_OPT -o defaults,noatime,nodev,nosuid "$DEVNODE" /home 2>/dev/null ||
+                   mount -o defaults,noatime,nodev,nosuid "$DEVNODE" /home 2>/dev/null; then
                     log_msg "Mounted $DEVNODE (FSTYPE=$FSTYPE, LABEL=FLX_HOME) -> /home"
                 else
                     log_msg "Failed to mount FLX_HOME partition $DEVNODE at /home"
                 fi
             else
                 log_msg "/home already mounted; skipping FLX_HOME device $DEVNODE"
-            fi
-            exit 0
-        fi
-
-        # The FreeLinX medium: a fixed path rather than /media/$MDEV, so
-        # /usr/sbin/xsetup and the README both name a path that does not depend
-        # on which device node the kernel happened to give the disc.  Read-only
-        # because it holds the boot chain.
-        if [ "$FS_LABEL" = "$MEDIUM_LABEL" ]; then
-            if grep -qs " $MEDIUM_MNT " /proc/mounts; then
-                log_msg "$MEDIUM_MNT already mounted; skipping $DEVNODE"
-                exit 0
-            fi
-            mkdir -p "$MEDIUM_MNT"
-            if mount -t "${FSTYPE:-iso9660}" -o "ro,noatime,nodev,nosuid" \
-                    "$DEVNODE" "$MEDIUM_MNT" 2>/dev/null; then
-                log_msg "Mounted $DEVNODE ($FSTYPE, LABEL=$MEDIUM_LABEL) -> $MEDIUM_MNT (ro)"
-            else
-                rmdir "$MEDIUM_MNT" 2>/dev/null || :
-                log_msg "Failed to mount the FreeLinX medium $DEVNODE at $MEDIUM_MNT"
             fi
             exit 0
         fi
@@ -111,17 +105,13 @@ case "$ACTION" in
         ;;
 
     remove)
-        # The medium is mounted at its own path, not at /media/$MDEV, so the
-        # unmount has to look in both places or the disc stays mounted after it
-        # is removed.
-        for mp in "$MEDIUM_MNT" "$MNTPOINT"; do
-            if grep -qs " $mp " /proc/mounts; then
-                umount -l "$mp" 2>/dev/null || :
-                log_msg "Unmounted $mp"
-            fi
-        done
-        rmdir "$MEDIUM_MNT" 2>/dev/null || :
-        rmdir "$MNTPOINT" 2>/dev/null || :
+        if grep -qs "$MNTPOINT" /proc/mounts; then
+            umount -l "$MNTPOINT" 2>/dev/null || :
+            rmdir "$MNTPOINT" 2>/dev/null || :
+            log_msg "Unmounted $MNTPOINT"
+        else
+            rmdir "$MNTPOINT" 2>/dev/null || :
+        fi
         ;;
 esac
 

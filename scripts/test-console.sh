@@ -200,7 +200,7 @@ fi
 # /dev/tty1, and left alone the script spends fifty seconds waiting for one to
 # appear.  /dev/null is named instead: it is a character device, it is always
 # there, and writing a banner to it discards the banner, which is what the check
-# does not care about.  Everything else - open_console, the redirect, the shell -
+# does not care about.  Everything else - start_console, the redirect, the shell -
 # is the code as shipped.
 echo '== flxconsole writes nothing to the console =='
 mkdir -p "$CROOT/dev" "$CROOT/sbin"
@@ -338,7 +338,7 @@ if grep -q '/etc/flx-installed' "$ROOTFS/sbin/flxconsole"; then
 else
 	no 'flxconsole cannot tell an installed system from the live medium'
 fi
-if sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
+if sed -n '/^start_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
 	grep -q 'GETTY -l "\$LOGINPROG"'
 then
 	ok 'an installed system gets a getty asking for a login'
@@ -347,11 +347,11 @@ else
 fi
 # The check that matters: the shell must be on the far side of that test, so a
 # missing getty cannot quietly fall through to it.
-_live=$(sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
+_live=$(sed -n '/^start_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
 	grep -n 'if \[ -e /etc/flx-installed \]' | cut -d: -f1)
 # Two lines start the shell - the normal one and the no-setsid fallback - and
 # the first is the one that has to sit behind the installed-system test.
-_shell=$(sed -n '/^open_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
+_shell=$(sed -n '/^start_console() {/,/^}/p' "$ROOTFS/sbin/flxconsole" |
 	grep -n 'LOGIN_SHELL" -l' | head -1 | cut -d: -f1)
 if [ -n "$_live" ] && [ -n "$_shell" ] && [ "$_live" -lt "$_shell" ]; then
 	ok 'the installed-system test comes before the shell is started'
@@ -383,7 +383,7 @@ if [ -d "$ROOTFS/var/service/mdevd" ]; then
 else
 	ok 'there is no second mdevd under /var/service'
 fi
-have "$ROOTFS/init" '/sbin/mdevd -f /etc/mdev.conf' '/init is the only thing that starts mdevd'
+have "$ROOTFS/init" '/sbin/mdevd -O 4 -f /etc/mdev.conf' '/init is the only thing that starts mdevd'
 
 # --- the console a person is looking at is the one that exists ---------------
 # console= is last-one-wins for /dev/console.  tty0 last means the screen, which

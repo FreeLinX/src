@@ -63,7 +63,11 @@ mount -t tmpfs    tmpfs    /run   2>/dev/null || :
 # uevent netlink socket.  One bound it, one failed, and runsvdir restarted the
 # loser about once a second for the life of the system.
 if [ -x /sbin/mdevd ]; then
-    /sbin/mdevd -f /etc/mdev.conf >>/var/log/mdevd.log 2>&1 &
+    # -O 4: replay the uevents the kernel has already sent through a 4-group
+    # readahead buffer instead of reading them one at a time.  On a machine
+    # with a few hundred devices at boot that is the difference between the
+    # coldplug finishing in a second and in ten.
+    /sbin/mdevd -O 4 -f /etc/mdev.conf >>/var/log/mdevd.log 2>&1 &
     if [ -x /sbin/mdevd-coldplug ]; then
         /sbin/mdevd-coldplug >>/var/log/mdevd.log 2>&1 || :
     fi
@@ -169,15 +173,52 @@ if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
     if [ -n "$_sys_uuid" ]; then
         set -- $(flx_find UUID "$_sys_uuid")
         if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
-            mkdir -p /mnt/flxsys
-            if mount -t "$2" -o noatime "$1" /mnt/flxsys 2>/dev/null; then
+            mkdir -p /mnt/flx_sys
+            if mount -t "$2" -o noatime "$1" /mnt/flx_sys 2>/dev/null; then
+                # A newer image on the boot partition than the one this
+                # filesystem was written by.  setup-disk records the version it
+                # left behind in .flx-image-version, and flxupgrade puts a newer
+                # kernel and image next to it, so a system that boots the new
+                # release must not go on running the old userland out of the
+                # filesystem the installer copied.
+                #
+                # /usr /bin /sbin /lib are replaced wholesale, because that is
+                # what the release means by a new version.  /etc is not: the
+                # user's settings, their users and their hostname are theirs,
+                # and only files the new image has and this one lacks are added,
+                # so a setting made since the install survives.  A package
+                # installed with xpkg into /usr also survives, because this
+                # copies the image over it instead of emptying the directory
+                # first.
+                _img=$(sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/os-release 2>/dev/null)
+                _sys=$(cat /mnt/flx_sys/.flx-image-version 2>/dev/null)
+                if [ -n "$_img" ] && [ "$_img" != "$_sys" ] && [ -d /mnt/flx_sys/usr ]; then
+                    echo "FreeLinX: the system partition was written by ${_sys:-an earlier release} and this is $_img; bringing the system files up to date, this takes a minute..." >&2
+                    for _d in usr bin sbin lib; do
+                        mkdir -p "/mnt/flx_sys/$_d"
+                        (cd / && tar cf - "$_d" 2>/dev/null) | (cd /mnt/flx_sys && tar xpf - 2>/dev/null) || :
+                    done
+                    (cd /etc && find . \( -type f -o -type l \) -print) 2>/dev/null | while IFS= read -r _f; do
+                        [ -e "/mnt/flx_sys/etc/$_f" ] || [ -L "/mnt/flx_sys/etc/$_f" ] && continue
+                        mkdir -p "/mnt/flx_sys/etc/$(dirname "$_f")"
+                        cp -a "/etc/$_f" "/mnt/flx_sys/etc/$_f" 2>/dev/null || :
+                    done
+                    # the release's identity is FreeLinX's, not the user's
+                    cp -a /etc/os-release /mnt/flx_sys/etc/os-release 2>/dev/null || :
+                    for _x in /mnt/flx_sys/etc/issue /mnt/flx_sys/etc/motd; do
+                        [ -f "$_x" ] && sed -i "s/ FreeLinX [0-9][0-9.]*/ FreeLinX $_img/" "$_x"
+                    done
+                    printf '%s\n' "$_img" > /mnt/flx_sys/.flx-image-version
+                    sync
+                    echo "FreeLinX: the system partition is now $_img" >&2
+                fi
                 for _d in usr etc var root bin sbin lib; do
-                    [ -d "/mnt/flxsys/$_d" ] || continue
-                    mount -o bind "/mnt/flxsys/$_d" "/$_d" 2>/dev/null ||
+                    [ -d "/mnt/flx_sys/$_d" ] || continue
+                    mount -o bind "/mnt/flx_sys/$_d" "/$_d" 2>/dev/null ||
                         echo "FreeLinX: the system partition has /$_d but it could not be put in place; that tree is in RAM" >&2
                 done
-                umount /mnt/flxsys 2>/dev/null || :
-                rmdir /mnt/flxsys 2>/dev/null || :
+                umount /mnt/flx_sys 2>/dev/null || :
+                rmdir /mnt/flx_sys 2>/dev/null || :
                 echo "FreeLinX: FLX_SYS persistent system engaged: /usr /etc /var /root /bin /sbin /lib are on $1, so packages and settings survive a reboot"
             else
                 echo "FreeLinX: the system partition $1 is pinned as FLX_SYS in /etc/flx-disk but did not mount; this system is running from RAM and nothing will survive a reboot" >&2

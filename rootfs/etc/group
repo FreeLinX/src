@@ -5,9 +5,11 @@ sys:x:3:
 adm:x:4:
 tty:x:5:
 disk:x:6:
-wheel:x:10:
-audio:x:29:
-video:x:44:
-input:x:97:
-storage:x:99:
-users:x:100:
+wheel:x:10:live
+audio:x:29:live
+video:x:44:live
+input:x:97:live
+storage:x:99:live
+users:x:100:live
+greeter:x:998:
+live:x:990:

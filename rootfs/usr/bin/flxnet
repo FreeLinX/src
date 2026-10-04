@@ -5,7 +5,7 @@ set -e
 show_menu() {
     clear
     echo "================================================="
-    echo "      FreeLinX Network Manager (non-GNU)        "
+    echo "      FreeLinX Network                  "
     echo "================================================="
     echo ""
     echo " Interfaces:"
@@ -44,9 +44,9 @@ while true; do
             printf "Enter SSID: "
             read -r ssid
             printf "Enter Password (leave empty for open): "
-            read -r pass
+            stty -echo 2>/dev/null; read -r pass; stty echo 2>/dev/null; echo
             echo "Connecting to $ssid..."
-            /sbin/flxwifi connect "$ssid" "$pass"
+            FLXWIFI_PASS="$pass" /sbin/flxwifi connect "$ssid"
             echo ""
             printf "Press Enter to continue..." && read -r dummy
             ;;

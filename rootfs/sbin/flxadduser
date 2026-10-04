@@ -24,15 +24,15 @@ fi
 
 # Validate username format
 case "$NEW_USER" in
-    *[!a-z0-9_-]*|^[0-9-]*)
-        echo "Error: Invalid username '$NEW_USER'. Use lowercase letters, digits, '_' or '-'." >&2
+    *[!a-z0-9_-]*|[0-9-]*|?????????????????????????????????*)
+        echo "Error: Invalid username '$NEW_USER'. Use up to 32 lowercase letters, digits, '_' or '-', starting with a letter or '_'." >&2
         exit 1
         ;;
 esac
 
-# Check if user already exists
-if grep -q "^$NEW_USER:" /etc/passwd 2>/dev/null; then
-    echo "Error: User '$NEW_USER' already exists." >&2
+# Check if the name is taken (a user, or a group such as wheel)
+if grep -qs "^$NEW_USER:" /etc/passwd /etc/group; then
+    echo "Error: User or group '$NEW_USER' already exists." >&2
     exit 1
 fi
 
@@ -46,24 +46,29 @@ if [ -r /etc/passwd ]; then
 fi
 
 USER_GID="$NEXT_UID"
+while grep -qs "^[^:]*:[^:]*:$USER_GID:" /etc/group; do
+    USER_GID=$((USER_GID + 1))
+done
 HOME_DIR="/home/$NEW_USER"
 
-# Add entry to /etc/passwd
-echo "$NEW_USER:x:$NEXT_UID:$USER_GID:$NEW_USER:$HOME_DIR:/bin/sh" >> /etc/passwd
+# Add entry to /etc/passwd, and a locked one to /etc/shadow (passwd below
+# sets the password; without a shadow line it has nothing to update)
+_ushell=$(cat /etc/flx-shell 2>/dev/null); [ -x "${_ushell:-/nonexistent}" ] || _ushell=/bin/sh
+echo "$NEW_USER:x:$NEXT_UID:$USER_GID:$NEW_USER:$HOME_DIR:$_ushell" >> /etc/passwd
+if [ -f /etc/shadow ] && ! grep -q "^$NEW_USER:" /etc/shadow; then
+    echo "$NEW_USER:!:$(( $(date +%s) / 86400 )):0:99999:7:::" >> /etc/shadow
+fi
 
 # Add primary group to /etc/group
 echo "$NEW_USER:x:$USER_GID:" >> /etc/group
 
-# Add to auxiliary groups (wheel, video, audio, input, disk)
-for grp in wheel video audio input disk; do
-    if grep -q "^$grp:" /etc/group; then
-        sed -i "/^$grp:/ s/$/,$NEW_USER/" /etc/group
-        # Clean double commas if any
-        sed -i "s/:,$NEW_USER/:$NEW_USER/" /etc/group
-        sed -i "s/,,/,/g" /etc/group
-    else
-        echo "$grp:x:$((USER_GID + 100)):$NEW_USER" >> /etc/group
-    fi
+# Add to the desktop groups flxinstall uses.  Not "disk": raw block device
+# access is root in all but name.  Groups the system lacks are skipped.
+for grp in wheel video audio storage input users; do
+    grep -q "^$grp:" /etc/group || continue
+    awk -F: -v g="$grp" -v u="$NEW_USER" 'BEGIN { OFS = ":" }
+        $1 == g { $4 = ($4 == "" ? u : $4 "," u) } { print }' /etc/group > /etc/group.flx &&
+        cat /etc/group.flx > /etc/group && rm -f /etc/group.flx
 done
 
 # Create home directory & skel
@@ -79,13 +84,19 @@ fi
 if [ ! -e "$HOME_DIR/.config/openbox/menu.xml" ]; then
     ln -sf /etc/xdg/openbox/menu.xml "$HOME_DIR/.config/openbox/menu.xml" 2>/dev/null || :
 fi
+if [ -d /root/.config/xfe ]; then
+    cp -a /root/.config/xfe "$HOME_DIR/.config/" 2>/dev/null || :
+fi
+if [ -f /root/.Xdefaults ]; then
+    cp -a /root/.Xdefaults "$HOME_DIR/.Xdefaults" 2>/dev/null || :
+fi
 
 # Create default .profile
 cat > "$HOME_DIR/.profile" << EOF
 export SHELL=/bin/sh
 export USER=$NEW_USER
 export HOME=$HOME_DIR
-export PATH=/usr/share/X11/xtree/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 export DISPLAY=:0
 export ENV=\$HOME/.profile
 EOF
@@ -95,7 +106,7 @@ chown -R "$NEXT_UID:$USER_GID" "$HOME_DIR"
 chmod 0750 "$HOME_DIR"
 
 echo "FreeLinX: User '$NEW_USER' created (UID: $NEXT_UID, GID: $USER_GID)."
-echo "Groups: $(id -Gn "$NEW_USER" 2>/dev/null || echo "wheel, video, audio, input, disk")"
+echo "Groups: $(id -Gn "$NEW_USER" 2>/dev/null || echo "wheel, video, audio, storage, input, users")"
 
 # Prompt to set password
 if command -v passwd >/dev/null 2>&1; then
