@@ -7,6 +7,8 @@ __pycache__/
 *.o
 *.a
 *.d
+# ...but not directories named *.d (etc/dbus-1/system.d, pam.d, conf.d)
+!*.d/
 *.bc
 *.ll
 

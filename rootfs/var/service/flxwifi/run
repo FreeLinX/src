@@ -1,0 +1,12 @@
+#!/bin/sh
+# WiFi at boot: once a wireless interface exists (driver and firmware load
+# a few seconds into boot; a USB adapter may come later), connect to the
+# networks saved by the installer or by "flxwifi connect".  The supplicant
+# runs in the foreground here, so runit restarts it if it dies.
+[ -s /etc/wpa_supplicant/flxwifi.conf ] || exec sleep 86400
+for d in /sys/class/net/*; do
+    [ -d "$d/wireless" ] || [ -d "$d/phy80211" ] || continue
+    export FLX_WIFI_IFACE="${d##*/}"
+    exec /sbin/flxwifi auto
+done
+exec sleep 10

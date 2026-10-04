@@ -1,0 +1,12 @@
+# /etc/ttys - terminals login(1) accepts, ttys(5) format.
+# "secure" lets root log in there (local consoles only).
+# name    getty                 type    status
+console   "/usr/bin/getty"      linux   on secure
+tty1      "/usr/bin/getty"      linux   on secure
+tty2      "/usr/bin/getty"      linux   on secure
+tty3      "/usr/bin/getty"      linux   on secure
+tty4      "/usr/bin/getty"      linux   on secure
+tty5      "/usr/bin/getty"      linux   on secure
+tty6      "/usr/bin/getty"      linux   on secure
+ttyS0     "/usr/bin/getty"      vt100   on secure
+ttyS1     "/usr/bin/getty"      vt100   on secure

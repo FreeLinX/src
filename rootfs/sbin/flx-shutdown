@@ -1,0 +1,37 @@
+#!/bin/sh
+# flx-shutdown poweroff|reboot - stop services, unmount persistent storage
+# cleanly, then power off or reboot through sysrq (pid 1 is a plain script,
+# there is no init to hand the request to).
+case "${1:-}" in
+    poweroff) key=o ;;
+    reboot)   key=b ;;
+    *) echo "usage: flx-shutdown poweroff|reboot" >&2; exit 2 ;;
+esac
+[ "$(id -u)" = 0 ] || { echo "flx-shutdown: must be root (try: doas $1)" >&2; exit 1; }
+
+# Started from the desktop, this runs inside the session that step 1 tears
+# down: leave that session first and ignore the signals it sends.
+if [ -z "${FLX_SHUTDOWN_DETACHED:-}" ] && command -v setsid >/dev/null 2>&1; then
+    FLX_SHUTDOWN_DETACHED=1 exec setsid "$0" "$@" </dev/null >/dev/null 2>&1
+fi
+trap '' HUP INT TERM
+
+echo "FreeLinX: $1 ..." > /dev/console 2>/dev/null || :
+# 1. services (graceful, bounded wait), then everything else
+if [ -d /var/service ]; then
+    for s in /var/service/*; do sv -w 3 down "$s" >/dev/null 2>&1 & done
+    wait
+fi
+kill -TERM -1 2>/dev/null; sleep 1
+kill -KILL -1 2>/dev/null
+sync
+# 2. persistent trees: deepest first; fall back to read-only if busy
+awk '$1 ~ "^/dev/" {print $2}' /proc/mounts | sort -r | while read -r m; do
+    case "$m" in /|/proc|/sys|/dev|/dev/*|/run) continue ;; esac
+    umount "$m" 2>/dev/null || mount -o remount,ro "$m" 2>/dev/null || :
+done
+sync
+echo 1 > /proc/sys/kernel/sysrq 2>/dev/null
+echo s > /proc/sysrq-trigger 2>/dev/null
+echo u > /proc/sysrq-trigger 2>/dev/null
+echo "$key" > /proc/sysrq-trigger

@@ -4,10 +4,13 @@
 #
 #   flxwifi scan                     : scan + list visible networks
 #   flxwifi list                     : list known networks (config)
-#   flxwifi connect "SSID" [pass]    : connect (open or WPA with password)
+#   flxwifi connect "SSID" [pass]    : connect (open or WPA with password;
+#                                      FLXWIFI_PASS=pass keeps it off the
+#                                      command line)
 #   flxwifi disconnect               : drop the current connection
 #   flxwifi status                   : show current connection
 #   flxwifi off                      : stop the supplicant
+#   flxwifi auto                     : (boot) connect to the saved networks
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 export PATH
@@ -54,50 +57,149 @@ cmd_scan()
 	[ -d "/sys/class/net/$IFACE" ] || die "wireless interface '$IFACE' not found. (Real WiFi requires physical hardware or USB WiFi passthrough)."
 	iface_up
 	ensure_sup
-	log "scanning on $IFACE (waiting 3s)..."
+	log "scanning on $IFACE..."
 	"$CLI" -i "$IFACE" scan > /dev/null 2>&1 || die "wpa_cli scan failed"
-	sleep 3
-	"$CLI" -i "$IFACE" scan_results
+	# results trickle in; poll for up to 10 s instead of guessing a delay
+	i=0
+	while [ "$i" -lt 10 ]; do
+		sleep 1; i=$((i + 1))
+		n=$("$CLI" -i "$IFACE" scan_results 2>/dev/null | wc -l)
+		[ "$n" -gt 1 ] && [ "$i" -ge 3 ] && break
+	done
+	# wpa_cli escapes SSIDs (\\" \\\\ \\xHH ...); print the real bytes so the name can
+	# be passed back to "flxwifi connect" unchanged. Control characters -> '?'.
+	"$CLI" -i "$IFACE" scan_results | awk -F'\t' '
+	function hexval(h,   i, c, v) {
+		v = 0
+		for (i = 1; i <= 2; i++) {
+			c = index("0123456789abcdef", tolower(substr(h, i, 1))) - 1
+			if (c < 0) return -1
+			v = v * 16 + c
+		}
+		return v
+	}
+	function dec(s,   out, i, c, n, v) {
+		out = ""
+		for (i = 1; i <= length(s); i++) {
+			c = substr(s, i, 1)
+			if (c == "\\" && i < length(s)) {
+				n = substr(s, i + 1, 1)
+				if (n == "x" && (v = hexval(substr(s, i + 2, 2))) >= 0) {
+					# raw byte as an octal escape for printf %b (awk %c would
+					# re-encode it as a Unicode code point)
+					out = out (v < 32 || v == 127 ? "?" : sprintf("\\0%03o", v)); i += 3
+				} else if (n == "n" || n == "t" || n == "r" || n == "e") {
+					out = out "?"; i++
+				} else {
+					out = out (n == "\\" ? "\\\\" : n); i++
+				}
+			} else out = out c
+		}
+		return out
+	}
+	NR == 1 { print; next }
+	{ printf "%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, dec($5) }' |
+	while IFS= read -r line; do printf '%b\n' "$line"; done
+}
+
+# saved networks: blocks in $NETWORKS (0600), the newest last; a network
+# connected again replaces its old block
+remember()
+{
+	mkdir -p "${NETWORKS%/*}"
+	# umask and the redirection inside one subshell: a redirection outside it
+	# is opened by this shell, with its umask, and the passwords were 0644
+	( umask 077
+	  { if [ -f "$NETWORKS" ]; then
+		awk -v h="$1" '
+		/^network=\{/ { blk = $0 "\n"; inb = 1; keep = 1; next }
+		inb { blk = blk $0 "\n"
+		      if ($0 ~ /^[ \t]*ssid=/) { v = $0; sub(/^[ \t]*ssid=/, "", v); if (v == h || v == "\"" ssid "\"") keep = 0 }
+		      if ($0 ~ /^}/) { if (keep) printf "%s", blk; inb = 0 }
+		      next }
+		{ print }' ssid="$ssid" "$NETWORKS"
+	  fi
+	  printf 'network={\n%s\n}\n' "$2"; } > "$NETWORKS.new" ) &&
+		chmod 600 "$NETWORKS.new" && mv -f "$NETWORKS.new" "$NETWORKS"
 }
 
 cmd_list()
 {
 	if [ -f "$NETWORKS" ]; then
 		log "known networks (from $NETWORKS):"
-		sed -n 's/network={//p; s/ssid="\(.*\)"/  \1/p' "$NETWORKS" 2>/dev/null
+		sed -n 's/^[ \t]*ssid=//p' "$NETWORKS" | while IFS= read -r v; do
+			case "$v" in
+			\"*) v=${v#\"}; printf '  %s\n' "${v%\"}" ;;
+			*) printf '  %b\n' "$(printf '%s' "$v" | awk '{
+				for (i = 1; i < length($0); i += 2) {
+					h = tolower(substr($0, i, 2))
+					printf "\\0%03o", (index("0123456789abcdef", substr(h, 1, 1)) - 1) * 16 + index("0123456789abcdef", substr(h, 2, 1)) - 1
+				} }')" ;;
+			esac
+		done
 	else
 		log "no saved networks in $NETWORKS"
 	fi
 }
 
+# boot: connect to the saved networks (wpa_supplicant picks the one in
+# range); run by the flxwifi service, which supervises the supplicant
+cmd_auto()
+{
+	[ -s "$NETWORKS" ] || exit 0
+	mkdir -p "$CTRL"
+	( umask 077; { printf 'ctrl_interface=%s\nupdate_config=1\n' "$CTRL"; cat "$NETWORKS"; } > "$CONF" )
+	iface_up
+	"$DHCP" -q -b "$IFACE" 2>/dev/null || :
+	exec "$SUP" -i "$IFACE" -c "$CONF" -D nl80211
+}
+
 cmd_connect()
 {
 	ssid=$1
-	pass=$2
-	[ -n "$ssid" ] || die "usage: flxwifi connect \"SSID\" [password]"
+	# the password: from FLXWIFI_PASS (environment: only root can read it)
+	# or, for old callers, the second argument (visible in ps meanwhile)
+	pass=${2-}
+	[ -z "$pass" ] && pass=${FLXWIFI_PASS-}
+	unset FLXWIFI_PASS
+	[ -n "$ssid" ] || die "usage: flxwifi connect \"SSID\" [password]  (or FLXWIFI_PASS=...)"
 	[ -d "/sys/class/net/$IFACE" ] || die "wireless interface '$IFACE' not found."
-
 	iface_up
 	ensure_sup
-	"$CLI" -i "$IFACE" flush > /dev/null 2>&1
+	# The network goes into the supplicant's own 0600 config, read back with
+	# "reconfigure": the password never appears on a command line.  The SSID
+	# is written as hex (SSIDs are arbitrary bytes: quotes, UTF-8, ...).
+	ssid_hex=$(printf '%s' "$ssid" | od -An -tx1 | tr -d ' \n')
 	if [ -n "$pass" ] && [ "$pass" != "-" ]; then
-		log "connecting to '$ssid' with WPA password..."
-		"$CLI" -i "$IFACE" add_network > /dev/null
-		"$CLI" -i "$IFACE" set_network 0 ssid "\"$ssid\""
-		psk=$("$PSKTOOL" "$ssid" "$pass" 2>/dev/null | sed -n 's/^\tpsk=//p')
-		if [ -n "$psk" ]; then
-			"$CLI" -i "$IFACE" set_network 0 psk "\"$psk\""
-		else
-			"$CLI" -i "$IFACE" set_network 0 psk "\"$pass\""
-		fi
-		"$CLI" -i "$IFACE" enable_network 0
+		log "connecting to '$ssid' with WPA2/WPA3 password..."
+		len=${#pass}
+		[ "$len" -ge 8 ] && [ "$len" -le 63 ] || die "password must be 8-63 characters"
+		case "$pass" in
+		*'
+'*) die "the password may not contain a newline" ;;
+		esac
+		# wpa_supplicant reads a quoted string up to its last quote, so any
+		# printable passphrase can be written as is
+		net=$(printf ' ssid=%s\n psk="%s"\n sae_password="%s"\n key_mgmt=WPA-PSK WPA-PSK-SHA256 SAE\n ieee80211w=1\n' \
+			"$ssid_hex" "$pass" "$pass")
 	else
 		log "connecting to open network '$ssid'..."
-		"$CLI" -i "$IFACE" add_network > /dev/null
-		"$CLI" -i "$IFACE" set_network 0 ssid "\"$ssid\""
-		"$CLI" -i "$IFACE" set_network 0 key_mgmt NONE
-		"$CLI" -i "$IFACE" enable_network 0
+		net=$(printf ' ssid=%s\n key_mgmt=NONE\n' "$ssid_hex")
 	fi
+	( umask 077
+	  printf 'ctrl_interface=%s\nupdate_config=1\nnetwork={\n%s\n}\n' "$CTRL" "$net" > "$CONF.new" ) &&
+		mv -f "$CONF.new" "$CONF" || die "cannot write $CONF"
+	remember "$ssid_hex" "$net"
+	"$CLI" -i "$IFACE" reconfigure > /dev/null || die "wpa_supplicant did not reload $CONF"
+	id=0
+	"$CLI" -i "$IFACE" select_network "$id" > /dev/null
+	# wait up to 20 s for the association before asking for an address
+	i=0
+	while [ "$i" -lt 20 ]; do
+		"$CLI" -i "$IFACE" status 2>/dev/null | grep -q '^wpa_state=COMPLETED' && break
+		sleep 1; i=$((i + 1))
+	done
+	[ "$i" -lt 20 ] || log "not associated yet (wrong password or out of range?)"
 	log "requesting IP via dhcpcd..."
 	"$DHCP" -q "$IFACE" 2>/dev/null || log "dhcpcd failed (check connection)"
 	log "done. status:"
@@ -107,7 +209,7 @@ cmd_connect()
 cmd_disconnect()
 {
 	"$CLI" -i "$IFACE" disconnect 2>/dev/null && log "disconnected" || log "not connected"
-	"$CLI" -i "$IFACE" remove_network 0 2>/dev/null || :
+	"$CLI" -i "$IFACE" remove_network all 2>/dev/null || :
 }
 
 cmd_status()
@@ -128,7 +230,8 @@ cmd_off()
 case "${1:-}" in
 	scan)       cmd_scan ;;
 	list)       cmd_list ;;
-	connect)    cmd_connect "$2" "$3" ;;
+	connect)    cmd_connect "${2-}" "${3-}" ;;
+	auto)       cmd_auto ;;
 	disconnect) cmd_disconnect ;;
 	status)     cmd_status ;;
 	off)        cmd_off ;;

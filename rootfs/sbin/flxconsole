@@ -79,6 +79,8 @@ GETTY=
 LOGINPROG=
 if [ -x /usr/bin/getty ]; then
 	GETTY=/usr/bin/getty
+	# the toybox package links its login into /usr/bin, next to getty
+	[ -x /usr/bin/login ] && LOGINPROG=/usr/bin/login
 	[ -x /usr/libexec/toybox/login ] && LOGINPROG=/usr/libexec/toybox/login
 	[ -x /bin/login ] && LOGINPROG=/bin/login
 elif [ -x /bin/toybox ]; then
@@ -160,8 +162,17 @@ open_console() {
 			*/ttyS[0-9]*) _baud=115200; _term=vt100 ;;
 			*)             _baud=38400;  _term=linux ;;
 			esac
-			# shellcheck disable=SC2086  # GETTY may be two words
-			$GETTY -l "$LOGINPROG" "$_baud" "$1" "$_term" &
+			# Respawned here, per console: getty exits when the session it
+			# started logs out, and this script only exits once every
+			# console has, so without the loop the first logout left that
+			# console with no login prompt until all the others logged out.
+			(
+				while :; do
+					# shellcheck disable=SC2086  # GETTY may be two words
+					$GETTY -l "$LOGINPROG" "$_baud" "$1" "$_term"
+					sleep 1
+				done
+			) &
 		else
 			# No getty on a system that is installed.  The console is left
 			# alone rather than handed a root shell, because that is the hole

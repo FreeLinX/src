@@ -2,10 +2,11 @@
 # FreeLinX /init - runit-based init with a bootstrap rescue fallback.
 #
 # pid 1: mount the pseudo filesystems, bring up the hostname, then exec
-# runsvdir to supervise the services in /var/service (dbus, ntpd, and the login
-# shell). If runsvdir is missing we drop to a rescue shell.
-
-set -eu
+# runsvdir to supervise the services in /var/service (dbus, ..., X/Openbox
+# session). If runsvdir is missing we drop to a rescue shell.
+# NOTE: no 'set -e' here - pid 1 must never exit because one command failed
+# (that would be a kernel panic). Only unset variables are treated as errors.
+set -u
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 export PATH
@@ -22,229 +23,243 @@ export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
 
 umask 022
 
-# --- /var/log -----------------------------------------------------------------
-# A runit service has nowhere to write but /dev/console otherwise, and
-# /dev/console is the terminal the operator is typing on.  ntpd -d logs to
-# stderr, dbus prints its bus address to stdout, and both of those landed on
-# the keyboard.  /var is on the initramfs here and on FLX_VAR or tmpfs once
-# installed, so this is a directory that has to exist at every boot.
-mkdir -p /var/log
-chmod 755 /var/log
-
-# --- pseudo filesystems -----------------------------------------------------
+# pseudo filesystems (mount proc FIRST - /proc/cmdline drives the desktop mode)
 mount -t proc     proc     /proc 2>/dev/null || :
+
+# FreeLinX desktop 
+CMDLINE="$(cat /proc/cmdline 2>/dev/null || true)"
+
+case " $CMDLINE " in
+    *flx.desktop=gui*)
+        printf '%s\n' gui > /etc/flx-desktop
+        ;;
+    *flx.desktop=headless*)
+        printf '%s\n' headless > /etc/flx-desktop
+        ;;
+    *)
+        [ -f /etc/flx-desktop ] || printf '%s\n' headless > /etc/flx-desktop
+        ;;
+esac
+
+# flx.tz=Area/City sets the time zone for this boot (live ISO default: UTC).
+case " $CMDLINE " in
+    *" flx.tz="*)
+        _tz="${CMDLINE##*flx.tz=}"; _tz="${_tz%% *}"
+        if [ -f "/usr/share/zoneinfo/$_tz" ]; then
+            printf '%s\n' "$_tz" > /etc/TZ
+            ln -sf "/usr/share/zoneinfo/$_tz" /etc/localtime
+        fi
+        ;;
+esac
+
+# pseudo filesystems continued
 mount -t sysfs    sysfs    /sys   2>/dev/null || :
 mount -t devtmpfs devtmpfs /dev   2>/dev/null || :
+ln -snf /proc/self/fd /dev/fd
+ln -snf fd/0 /dev/stdin
+ln -snf fd/1 /dev/stdout
+ln -snf fd/2 /dev/stderr
 mkdir -p /dev/pts /run/user /dev/shm
+mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 mount -t devpts -o gid=5,mode=0620,ptmxmode=0666 devpts /dev/pts 2>/dev/null || :
 rm -f /dev/ptmx && ln -s /dev/pts/ptmx /dev/ptmx
-
-# devtmpfs makes device nodes and nothing else, so /dev/fd and the three names
-# under it are missing.  Several programs in this tree open /dev/stdin rather
-# than file descriptor 0 - this system's sort does, and fails with
-#
-#   sort: /dev/stdin: No such file or directory
-#
-# on every pipeline it is given, which is not a sort problem to work around at
-# each call site but a name that ought to be there.  /dev/fd is the Linux
-# convention for it: a directory whose entries are /proc/self/fd/N.
-[ -e /dev/fd ] || ln -s /proc/self/fd /dev/fd
-for _fd in stdin stdout stderr; do
-	[ -e "/dev/$_fd" ] || ln -s "/proc/self/fd/$_fd" "/dev/$_fd"
-done
-unset _fd
 mount -t tmpfs    tmpfs    /run   2>/dev/null || :
+# POSIX shared memory (shm_open): Firefox, GTK and dbus need a world-writable
+# tmpfs here; a bare directory on devtmpfs is root-only.
+mount -t tmpfs -o mode=1777,nosuid,nodev shm /dev/shm 2>/dev/null || chmod 1777 /dev/shm
+# XDG runtime dirs: no seat manager creates /run/user/<uid>, so sessions
+# make their own (0700) inside a sticky parent.
+mkdir -p /run/user && chmod 1777 /run/user
 
-# --- Device Manager (mdevd) & Driver Auto-Probe ------------------------------
-#
-# mdevd starts here and not under runsvdir: the mount scan below, flxdriver and
-# every service need /dev populated, and a service would not be listening yet.
-# There was also a var/service/mdevd, so two mdevd processes raced for the one
-# uevent netlink socket.  One bound it, one failed, and runsvdir restarted the
-# loser about once a second for the life of the system.
+# Enable sysrq for reboot/poweroff via /proc/sysrq-trigger
+echo 1 > /proc/sys/kernel/sysrq 2>/dev/null || :
+# /tmp is shared by every user: no following another user's symlink or
+# hardlink there, no opening their files or FIFOs with O_CREAT (the kernel
+# defaults leave all of this off)
+for _p in protected_symlinks:1 protected_hardlinks:1 protected_regular:2 protected_fifos:1; do
+    echo "${_p#*:}" > "/proc/sys/fs/${_p%%:*}" 2>/dev/null || :
+done
+# kernel pointers and the kernel log are for root
+echo 1 > /proc/sys/kernel/kptr_restrict 2>/dev/null || :
+echo 1 > /proc/sys/kernel/dmesg_restrict 2>/dev/null || :
+
+# The basic character devices must be usable by non-root sessions even if a
+# hotplug rule re-applies a stricter mode.
+fix_basic_devs() {
+    chmod 0666 /dev/null /dev/zero /dev/full /dev/random /dev/urandom /dev/tty 2>/dev/null || :
+}
+
+# Device Manager (mdevd) & Driver Auto-probe
 if [ -x /sbin/mdevd ]; then
-    /sbin/mdevd -f /etc/mdev.conf >>/var/log/mdevd.log 2>&1 &
+    # -O 4: rebroadcast processed uevents on netlink group 4, where
+    # libudev-zero (Xorg input hotplug, libinput) listens.
+    # Logged rather than discarded: a device that never appears is otherwise
+    # a silent failure, and the console is not the place for it.
+    mkdir -p /var/log
+    /sbin/mdevd -O 4 -f /etc/mdev.conf >>/var/log/mdevd.log 2>&1 &
     if [ -x /sbin/mdevd-coldplug ]; then
         /sbin/mdevd-coldplug >>/var/log/mdevd.log 2>&1 || :
+        fix_basic_devs
     fi
 fi
 if [ -x /sbin/flxdriver ]; then
     /sbin/flxdriver probe >/dev/null 2>&1 || :
 fi
+fix_basic_devs   # again: coldplug events are applied asynchronously
 
-# --- Persistent /home (disk=/home boot model) --------------------------------
+# Persistent /home (disk=/home boot model)
 # The ext4 partition labeled FLX_HOME carries the persistent /home.
 # It is normally mounted by /sbin/flxautomount via mdevd hotplug; the scan
 # below is a cold-boot fallback so /home is ready before services start.
 # The bundled mount(1) needs an explicit -t (no auto-detect), so the
 # partition type is resolved via blkid by label.
-#
-# The medium this system booted from is found the same way, by its volume id
-# FREELINX_MEDIUM, and mounted read-only at /media/flx.  /usr/sbin/xsetup reads
-# the installer from there, so without this the installer is on the disc and
-# not reachable from the system booted off that disc.
-#
-# FREELINX_VAR is the third label, and it is what "data mode" is for.  That mode
-# runs the system from RAM and keeps one filesystem on a disk for /var, so that
-# state survives a reboot.  /var is where the things that must survive go:
-# /var/lib/xpkg is the package database, /var/lib/lbu the local overlay,
-# /var/log the logs, /var/cache the package cache.  In RAM-only mode all of that
-# is thrown away on reboot, which is what makes a second disk worth creating.
-#
-# It is mounted before /home because a package database that is being read while
-# the filesystem underneath it is still being written is not a thing to arrange
-# on purpose.  noatime because the times of /var/lib are not interesting, and
-# the writes they cost on every read are.
-#
-# Each scan waits for the device node.  /sys/class/block lists a partition
-# before devtmpfs has made /dev/vdaN for it, and the bundled mount(8) says so
-# plainly:
-#
-#   mount: /dev/vda3: No such file or directory
-#
-# which is indistinguishable from a partition that does not exist, so a scan
-# that does not wait silently gives up on a disk that is perfectly fine.  The
-# wait is on the node, not on the label: a node that is present but carries the
-# wrong label is a real answer and ends the loop immediately.
-flx_find_by_label() {
-    _want=$1
-    _dev=
-    _tries=0
-    while [ "$_tries" -lt 50 ]; do
-        for _pt in /sys/class/block/*; do
-            [ -d "$_pt" ] || continue
-            _name=$(basename "$_pt")
-            _node="/dev/$_name"
-            [ -b "$_node" ] || continue
-            _out=$(blkid "$_node" 2>/dev/null || true)
-            _label=$(echo "$_out" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
-            if [ "$_label" = "$_want" ]; then
-                _dev=$_node
+# The installed system's own partitions, pinned by UUID (flxinstall and
+# flxupgrade write /etc/flx-disk into the boot image).  Without the pin any
+# disk carrying the right label - a USB stick - would become /home or the
+# whole system.
+flx_pin() { sed -n "s/^$1=\\([0-9A-Fa-f-]*\\)\$/\\1/p" /etc/flx-disk 2>/dev/null | head -1; }
+FLX_SYS_UUID=$(flx_pin FLX_SYS_UUID)
+FLX_HOME_UUID=$(flx_pin FLX_HOME_UUID)
+flx_uuid() { echo "$1" | grep -o ' UUID="[^"]*"' | cut -d'"' -f2; }
+
+# The live system never takes a /home from an attached disk.
+if [ -f /etc/flx-installed ] && { [ -x /bin/mount ] || [ -x /sbin/mount ]; }; then
+    if ! grep -qs ' /home ' /proc/mounts; then
+        for pt in /sys/class/block/*; do
+            [ -d "$pt" ] || continue
+            case "$(basename "$pt")" in
+                *[0-9]) ;;
+                *) continue ;;
+            esac
+            BLKOUT="$(blkid "/dev/$(basename "$pt")" 2>/dev/null || true)"
+            FLX_LABEL=$(echo "$BLKOUT" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
+            FLX_TYPE=$(echo "$BLKOUT" | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
+            if [ "$FLX_LABEL" = "FLX_HOME" ] && [ -n "$FLX_TYPE" ]; then
+                [ -n "$FLX_HOME_UUID" ] && [ "$(flx_uuid "$BLKOUT")" != "$FLX_HOME_UUID" ] && continue
+                mkdir -p /home
+                grep -qs " /home " /proc/mounts \
+                    || mount -t "$FLX_TYPE" -o "defaults,noatime,nodev,nosuid" "/dev/$(basename "$pt")" /home 2>/dev/null
                 break
             fi
         done
-        [ -n "$_dev" ] && break
-        _tries=$((_tries + 1))
-        sleep 0.2
-    done
-    if [ -n "$_dev" ]; then
-        _type=$(blkid "$_dev" 2>/dev/null | grep -o 'TYPE="[^"]*"' | cut -d'"' -f2 || true)
-        printf '%s %s\n' "$_dev" "$_type"
-    fi
-}
-
-if [ -x /bin/mount ] || [ -x /sbin/mount ]; then
-    # The data filesystem first: see the note above flx_find_by_label.
-    #
-    # Not fatal when it is absent.  A machine that was installed with sys or
-    # none has no such partition, and that is the normal case, not a failure.
-    # Failing to boot because an optional filesystem was not plugged in is worse
-    # than the filesystem being missing.
-    if ! grep -qs ' /var ' /proc/mounts; then
-        set -- $(flx_find_by_label FREELINX_VAR)
-        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
-            mkdir -p /var
-            grep -qs ' /var ' /proc/mounts \
-                || mount -t "$2" -o "defaults,noatime" "$1" /var 2>/dev/null \
-                || echo "FreeLinX: the data filesystem $1 is labelled FREELINX_VAR but did not mount at /var; /var is in RAM and nothing will survive a reboot" >&2
-        fi
-    fi
-
-    if ! grep -qs ' /home ' /proc/mounts; then
-        set -- $(flx_find_by_label FLX_HOME)
-        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
-            mkdir -p /home
-            grep -qs " /home " /proc/mounts \
-                || mount -t "$2" -o "defaults,noatime" "$1" /home 2>/dev/null
-        fi
-    fi
-
-    # The medium, read-only: this filesystem is the boot chain, and nothing on
-    # a running system has a reason to write to it.
-    if ! grep -qs ' /media/flx ' /proc/mounts; then
-        set -- $(flx_find_by_label FREELINX_MEDIUM)
-        if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
-            mkdir -p /media/flx
-            mount -t "$2" -o "ro,noatime,nodev,nosuid" "$1" /media/flx 2>/dev/null ||
-                echo "FreeLinX: could not mount the medium $1 at /media/flx" >&2
-        fi
     fi
 fi
 
-# --- Input devices (evdev) ---------------------------------------------------
-# Map keyboards and mouse/tablet evdev nodes to /dev/fl-kbd and /dev/fl-pointer
-# for Xorg evdev driver.
-rm -f /dev/fl-kbd /dev/fl-pointer
-NAME=""
-FOUND_TABLET=""
-FOUND_MOUSE=""
-FOUND_KBD=""
-if [ -r /proc/bus/input/devices ]; then
-    while IFS= read -r line; do
-        case "$line" in
-            I:*)
-                NAME=""
-                ;;
-            N:\ Name=\"*)
-                NAME="${line#N: Name=\"}"
-                NAME="${NAME%\"}"
-                ;;
-            H:\ Handlers=*)
-                for h in ${line#H: Handlers=}; do
-                    case "$h" in
-                        event*)
-                            case "$NAME" in
-                                *[Kk]eyboard*)
-                                    [ -z "$FOUND_KBD" ] && FOUND_KBD="/dev/input/$h"
-                                    ;;
-                                *[Tt]ablet*)
-                                    FOUND_TABLET="/dev/input/$h"
-                                    ;;
-                                *[Mm]ouse*|*[Ee]xplorer*|*[Tt]ouchpad*)
-                                    [ -z "$FOUND_MOUSE" ] && FOUND_MOUSE="/dev/input/$h"
-                                    ;;
-                            esac
-                            ;;
-                    esac
-                done
-                ;;
+# Persistent system state (FLX_SYS, disk=/root overlay model)
+# Installed images carry /etc/flx-installed (baked by flxinstall).  On such
+# systems, the ext4 partition labeled FLX_SYS holds persistent copies of
+# /usr, /etc, /var and /root.  Bind-mounting them keeps xpkg-installed
+# packages, system config and package state across reboots while the base
+# initramfs stays pristine.  The live ISO never has the marker, so a stale
+# FLX_SYS partition on an attached disk is ignored there.  A tree is only
+# bind-mounted when its persistent copy is non-empty, so an empty/partial
+# FLX_SYS can never shadow the working base with nothing.
+if [ -f /etc/flx-installed ]; then
+    FLX_SYS_DEV=""
+    for pt in /sys/class/block/*; do
+        [ -d "$pt" ] || continue
+        case "$(basename "$pt")" in
+            *[0-9]) ;;
+            *) continue ;;
         esac
-    done < /proc/bus/input/devices
-fi
-
-if [ -n "$FOUND_KBD" ]; then
-    ln -sf "$FOUND_KBD" /dev/fl-kbd
-fi
-if [ -n "$FOUND_TABLET" ] && [ -n "$FOUND_MOUSE" ]; then
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
-elif [ -n "$FOUND_TABLET" ]; then
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer
-    ln -sf "$FOUND_TABLET" /dev/fl-pointer2
-elif [ -n "$FOUND_MOUSE" ]; then
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer
-    ln -sf "$FOUND_MOUSE" /dev/fl-pointer2
-fi
-
-if [ ! -e /dev/fl-kbd ]; then
-    for ev in /dev/input/event*; do
-        [ -e "$ev" ] || continue
-        ln -sf "$ev" /dev/fl-kbd
-        break
-    done
-fi
-if [ ! -e /dev/fl-pointer ]; then
-    for ev in /dev/input/event*; do
-        [ -e "$ev" ] || continue
-        if [ "$ev" != "$(readlink /dev/fl-kbd 2>/dev/null)" ]; then
-            ln -sf "$ev" /dev/fl-pointer
+        BLKOUT="$(blkid "/dev/$(basename "$pt")" 2>/dev/null || true)"
+        FLX_LABEL=$(echo "$BLKOUT" | grep -o 'LABEL="[^"]*"' | cut -d'"' -f2 || true)
+        if [ "$FLX_LABEL" = "FLX_SYS" ]; then
+            [ -n "$FLX_SYS_UUID" ] && [ "$(flx_uuid "$BLKOUT")" != "$FLX_SYS_UUID" ] && continue
+            FLX_SYS_DEV="/dev/$(basename "$pt")"
             break
         fi
     done
+    if [ -n "$FLX_SYS_DEV" ] && ! grep -qs ' /mnt/flx_sys ' /proc/mounts; then
+        mkdir -p /mnt/flx_sys
+        mount -t ext4 -o defaults,noatime "$FLX_SYS_DEV" /mnt/flx_sys 2>/dev/null || :
+        if grep -qs ' /mnt/flx_sys ' /proc/mounts; then
+            if [ -x /sbin/flxbind ]; then
+                # A newer FreeLinX image on the boot partition (flxupgrade,
+                # or a 1.0.x system booting its first 1.0.5 image): refresh
+                # the system files on FLX_SYS from this image.  The user's
+                # configuration in /etc stays; only files it lacks are added,
+                # and a few FreeLinX settings that older releases wrote are
+                # migrated.  Packages installed with xpkg stay in place.
+                _img=$(sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/os-release 2>/dev/null)
+                _sys=$(cat /mnt/flx_sys/.flx-image-version 2>/dev/null)
+                if [ -n "$_img" ] && [ "$_img" != "$_sys" ] && [ -d /mnt/flx_sys/usr ]; then
+                    echo "FreeLinX ${_sys:-1.0.x} -> $_img: updating the system files, this takes a minute..." > /dev/console 2>/dev/null || :
+                    for _p in usr/share/X11/xtree usr/share/netsurf usr/bin/netsurf usr/bin/netsurf-bin \
+                              usr/bin/netsurf-fb usr/bin/netsurf-gtk3 usr/share/applications/netsurf.desktop \
+                              bin/dwm bin/dmenu bin/st bin/slstatus bin/nsxiv bin/xclip bin/xinit bin/doom \
+                              bin/xfe bin/xfw bin/xfp bin/xfi usr/bin/xdemo; do
+                        rm -rf "/mnt/flx_sys/$_p"
+                    done
+                    for d in usr bin sbin lib; do
+                        mkdir -p "/mnt/flx_sys/$d"
+                        (cd / && tar cf - "$d" 2>/dev/null) | (cd /mnt/flx_sys && tar xpf - 2>/dev/null) || :
+                    done
+                    (cd /etc && find . \( -type f -o -type l \) -print) | while IFS= read -r _f; do
+                        [ -e "/mnt/flx_sys/etc/$_f" ] || [ -L "/mnt/flx_sys/etc/$_f" ] && continue
+                        mkdir -p "/mnt/flx_sys/etc/$(dirname "$_f")"
+                        cp -a "/etc/$_f" "/mnt/flx_sys/etc/$_f" 2>/dev/null || :
+                    done
+                    _e=/mnt/flx_sys/etc
+                    for _x in "$_e"/X11/xorg*.conf; do
+                        [ -f "$_x" ] && sed -i 's#/usr/share/X11/xtree/lib/xorg/modules#/usr/lib/xorg/modules#' "$_x"
+                    done
+                    for _x in "$_e/profile" "$_e/X11/xinit/xinitrc"; do
+                        [ -f "$_x" ] && sed -i 's#/usr/share/X11/xtree/bin:##g; s#/bin/dwm#/usr/bin/dwm#g; s#/bin/slstatus#/usr/bin/slstatus#g' "$_x"
+                    done
+                    # the release's identity is FreeLinX's, not the user's
+                    cp -a /etc/os-release "$_e/os-release" 2>/dev/null || :
+                    for _x in "$_e/issue" "$_e/motd"; do
+                        [ -f "$_x" ] && sed -i "s/^ FreeLinX 1\.0[0-9.]*\$/ FreeLinX $_img/" "$_x"
+                    done
+                    [ -f "$_e/xdg/openbox/menu.xml" ] && \
+                        sed -i '/<item label="NetSurf/,/<\/item>/d' "$_e/xdg/openbox/menu.xml"
+                    # 1.0.7: the update check service and its panel item
+                    [ -d /mnt/flx_sys/var/service/flxupdates ] || {
+                        mkdir -p /mnt/flx_sys/var/service
+                        cp -a /var/service/flxupdates /mnt/flx_sys/var/service/ 2>/dev/null || :
+                    }
+                    [ -f "$_e/xdg/tint2/tint2rc" ] && ! grep -q '^execp' "$_e/xdg/tint2/tint2rc" && \
+                        cp -a /etc/xdg/tint2/tint2rc "$_e/xdg/tint2/tint2rc" 2>/dev/null
+                    echo "$_img" > /mnt/flx_sys/.flx-image-version
+                    sync
+                fi
+                # /bin /sbin /lib persist too: xpkg installs NetBSD tools to
+                # /bin and kernel modules/firmware to /lib.  Systems installed
+                # before 1.0.2 had only usr etc var root on FLX_SYS: seed the
+                # others once from this image.
+                for d in bin sbin lib; do
+                    if [ ! -d "/mnt/flx_sys/$d" ] || [ -z "$(ls -A "/mnt/flx_sys/$d" 2>/dev/null)" ]; then
+                        mkdir -p "/mnt/flx_sys/$d"
+                        (cd / && tar cf - "$d" 2>/dev/null) | (cd /mnt/flx_sys && tar xf - 2>/dev/null) || :
+                    fi
+                done
+                _kmods_before=0
+                [ -d "/lib/modules/$(uname -r)" ] && _kmods_before=1
+                for d in usr etc var root bin sbin lib; do
+                    if [ -d "/mnt/flx_sys/$d" ] && [ -n "$(ls -A "/mnt/flx_sys/$d" 2>/dev/null)" ]; then
+                        /sbin/flxbind "/mnt/flx_sys/$d" "/$d" 2>/dev/null || :
+                    fi
+                done
+                # a kernel updated with xpkg finds its modules only now: probe
+                # the hardware again
+                if [ "$_kmods_before" = 0 ] && [ -d "/lib/modules/$(uname -r)" ] && [ -x /sbin/mdevd-coldplug ]; then
+                    /sbin/mdevd-coldplug >/dev/null 2>&1 || :
+                fi
+                # xpkg before 1.0.1 created a missing /var/cache as 0700, which
+                # hid the package indexes from everyone but root
+                [ -d /var/cache ] && chmod 755 /var/cache 2>/dev/null
+                _nbound=$(grep -c -E ' /(usr|etc|var|root|bin|sbin|lib) ' /proc/mounts 2>/dev/null || echo 0)
+                echo "FLX_SYS persistent system engaged: $_nbound trees bound" >/dev/ttyS0 2>/dev/null || :
+            else
+                echo "FLX_SYS partition found but flxbind missing - persistence disabled" >/dev/ttyS0 2>/dev/null || :
+            fi
+        fi
+    fi
 fi
-if [ ! -e /dev/fl-pointer2 ] && [ -e /dev/fl-pointer ]; then
-    ln -sf "$(readlink /dev/fl-pointer)" /dev/fl-pointer2
-fi
+
+# Input devices: Xorg hot-plugs them (udev backend over libudev-zero, fed
+# by mdevd -O 4) and drives them with libinput.
 
 # --- XKB defaults (kept for GTK apps / X clients; the X server itself is
 # configured through xorg.conf, so do NOT export these before X starts) ------
@@ -259,12 +274,22 @@ fi
 # to dhcpcd, since hard-coding the QEMU addresses on a physical NIC would
 # misconfigure the network.
 if [ -r /sys/class/dmi/id/sys_vendor ] && grep -qi qemu /sys/class/dmi/id/sys_vendor; then
-    /sbin/flxifconfig eth0 inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
-    /sbin/flxifconfig eth0 up 2>/dev/null || :
+    _iface=""
+    for dev in /sys/class/net/*; do
+        [ -d "$dev" ] || continue
+        _name=$(basename "$dev")
+        if [ "$_name" != "lo" ]; then
+            _iface="$_name"
+            break
+        fi
+    done
+    _iface="${_iface:-eth0}"
+    /sbin/flxifconfig "$_iface" inet 10.0.2.15/24 2>/dev/null || /sbin/ifconfig "$_iface" 10.0.2.15 netmask 255.255.255.0 up 2>/dev/null || :
+    /sbin/flxifconfig "$_iface" up 2>/dev/null || :
     /sbin/flxroute add default 10.0.2.2 2>/dev/null || /sbin/route add default gw 10.0.2.2 2>/dev/null || :
-    printf "nameserver 10.0.2.3\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+    printf "nameserver 10.0.2.3\n" > /etc/resolv.conf
 fi
-/sbin/dhcpcd -q -b eth0 2>/dev/null || :
+/sbin/dhcpcd -q -b "${_iface:-eth0}" 2>/dev/null || :
 
 # --- hostname ---------------------------------------------------------------
 _hostname=""
@@ -272,6 +297,15 @@ if [ -r /etc/hostname ]; then
     _hostname=$(cat /etc/hostname 2>/dev/null | tr -d '[:space:]')
 fi
 [ -n "$_hostname" ] && hostname "$_hostname"
+
+# --- explicit rescue shell (flx.rescue=1, used by the bootloader rescue
+# entry; the old init=/bin/sh trick does not work with rdinit=/init) ----------
+case " $CMDLINE " in
+    *flx.rescue=1*)
+        echo "FreeLinX: rescue shell (flx.rescue=1) - type 'exit' to halt." >&2
+        exec /bin/sh -l < /dev/console > /dev/console 2>&1
+        ;;
+esac
 
 # --- runit service supervision -----------------------------------------------
 if [ -x /sbin/runsvdir ]; then

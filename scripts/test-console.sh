@@ -355,7 +355,7 @@ if [ -d "$ROOTFS/var/service/mdevd" ]; then
 else
 	ok 'there is no second mdevd under /var/service'
 fi
-have "$ROOTFS/init" '/sbin/mdevd -f /etc/mdev.conf' '/init is the only thing that starts mdevd'
+have "$ROOTFS/init" '/sbin/mdevd -O 4 -f /etc/mdev.conf' '/init is the only thing that starts mdevd'
 
 # --- the console a person is looking at is the one that exists ---------------
 # console= is last-one-wins for /dev/console.  tty0 last means the screen, which
