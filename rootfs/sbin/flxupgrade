@@ -98,6 +98,19 @@ MP=/mnt/flx_upgrade_boot
 RP=/mnt/flx_upgrade_root
 mkdir -p "$MP" "$RP"
 trap 'umount "$MP" 2>/dev/null || :; umount "$RP" 2>/dev/null || :; rmdir "$MP" "$RP" 2>/dev/null || :' EXIT INT TERM
+# The live session's automounter mounts every labeled partition it sees -
+# this disk's FLX_ROOT at /media/vda3 and its FLX_HOME at /home among them -
+# and e2fsck refuses a mounted filesystem, so the upgrade dies claiming
+# filesystem errors that are not there.  Tell the automounter to step aside
+# (the same flag setup-disk.sh uses) and unmount what it already holds, the
+# way setup-disk.sh does before it partitions.  The partitions are mounted
+# again below, at MP and RP.
+: >/run/flxinstall-active
+for _dev in "$BOOT_DEV" "$ROOT_DEV" "$HOME_DEV"; do
+	[ -n "$_dev" ] || continue
+	grep "^$_dev " /proc/mounts 2>/dev/null | cut -d ' ' -f 2 |
+	while IFS= read -r _m; do umount "$_m" 2>/dev/null || :; done
+done
 mount -t vfat "$BOOT_DEV" "$MP" || die "cannot mount $BOOT_DEV"
 e2fsck -p "$ROOT_DEV" >/dev/null 2>&1 || [ $? -le 1 ] || die "$ROOT_DEV has filesystem errors: run e2fsck $ROOT_DEV first"
 mount -t ext4 "$ROOT_DEV" "$RP" || die "cannot mount $ROOT_DEV"
